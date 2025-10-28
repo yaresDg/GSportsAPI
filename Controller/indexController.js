@@ -2,8 +2,7 @@ import fs from 'fs/promises';
 import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import {DateTime } from 'luxon';
-import { getEventDuration, parseEventDate } from '../filters.js';
+import { getEventDuration, parseEventDate, orderByRelevantEvents } from '../filters.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname=path.dirname(__filename);
@@ -17,48 +16,14 @@ const getAgenda=async (req,res)=>{
         }
         const data = await fs.readFile(filePath, 'utf-8');
         let allEvents=JSON.parse(data);
-        //Recivimos una queryString con el tiempo del cliente
+        //Recivimos una queryString con el tiempo y la zona horaria del cliente
         const clientTimeString=req.query.time;
         const clientZoneString=req.query.zone || 'UTC';
         if(!clientTimeString){
             return res.json(allEvents);
         }
-        //Tenemos que calcular el inicio y fin del día según la zona horaria del cliente
-        const clientDateTime= DateTime.fromISO(clientTimeString, { zone: clientZoneString });
-        if(!clientDateTime.isValid){
-            return res.status(400).json({ 
-                error: 'Formato de clientTime inválido. Use ISO 8601.',
-                details: clientDateTime.invalidReason 
-            });
-        }
-        const clientTimezone=clientDateTime.zoneName;
-        const now=clientDateTime;
-        const startOfDay= clientDateTime.startOf('day');
-        const endOfDay= clientDateTime.endOf('day');
-        //Ahora filtramos los eventos que ocurren en ese rango
-        const relevantEvents=allEvents.filter(event=>{
-            const startTime=parseEventDate(event);
-            if(!startTime) return false;
-            const eventStartInClientTZ = DateTime.fromJSDate(startTime, {zone: 'UTC'}).setZone(clientTimezone);
-            if (!eventStartInClientTZ.isValid) {
-                console.error(`Evento inválido: ${event.idEvent}`, eventStartInClientTZ.invalidReason);
-                return false;
-            }
-            const durationInMillis=getEventDuration(event.strSport || event.strLeague)
-            const eventEndInClientTZ = eventStartInClientTZ.plus({ milliseconds: durationInMillis });
-            //Descartar eventos que hayan terminado
-            if(eventEndInClientTZ < now) return false;
-            const isWithinToday = eventStartInClientTZ >= startOfDay && eventStartInClientTZ <= endOfDay;
-            const isOngoinFromYesterday = eventStartInClientTZ < startOfDay && eventEndInClientTZ > startOfDay;
-            return isWithinToday || isOngoinFromYesterday;
-        });
-        //Hordenar por fecha
-        relevantEvents.sort((a,b)=>{
-            const ad = parseEventDate(a) || new Date(8640000000000000);
-            const bd = parseEventDate(b) || new Date(8640000000000000);
-            return ad - bd;
-        });
-        return res.json(relevantEvents);
+        const relevantEventsResponse=orderByRelevantEvents(clientTimeString,clientZoneString, allEvents);
+        return res.json(relevantEventsResponse);
     }
     catch (error) {
         console.error('Error en getAgenda:', error);

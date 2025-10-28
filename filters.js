@@ -1,3 +1,5 @@
+import {DateTime } from 'luxon';
+
 
 //Calcula la duración estimada de un evento según el deporte
 function getEventDuration(sport) {
@@ -28,4 +30,37 @@ function parseEventDate(event) {
     return isNaN(d.getTime()) ? null : d;
 }
 
-export { getEventDuration, parseEventDate };
+function orderByRelevantEvents(clientTimeString,clientZoneString, allEvents){
+    //Tenemos que calcular el inicio y fin del día según la zona horaria del cliente
+    const clientDateTime= DateTime.fromISO(clientTimeString, { zone: clientZoneString });
+    if(!clientDateTime.isValid){
+        throw new Error(`Formato de clientTime inválido (${clientDateTime.invalidReason})`);
+    }
+    const clientTimezone=clientDateTime.zoneName;
+    const now=clientDateTime;
+    const startOfDay= clientDateTime.startOf('day');
+    const endOfDay= clientDateTime.endOf('day');
+    //Ahora filtramos los eventos que ocurren en ese rango
+    const relevantEvents=allEvents.filter(event=>{
+        const startTime=parseEventDate(event);
+        if(!startTime) return false;
+        const eventStartInClientTZ = DateTime.fromJSDate(startTime, {zone: 'UTC'}).setZone(clientTimezone);
+        if (!eventStartInClientTZ.isValid) return false;
+        const durationInMillis=getEventDuration(event.strSport || event.strLeague)
+        const eventEndInClientTZ = eventStartInClientTZ.plus({ milliseconds: durationInMillis });
+        //Descartar eventos que hayan terminado
+        if(eventEndInClientTZ < now) return false;
+        const isWithinToday = eventStartInClientTZ >= startOfDay && eventStartInClientTZ <= endOfDay;
+        const isOngoinFromYesterday = eventStartInClientTZ < startOfDay && eventEndInClientTZ > startOfDay;
+        return isWithinToday || isOngoinFromYesterday;
+    });
+    //Hordenar por fecha
+    relevantEvents.sort((a,b)=>{
+        const ad = parseEventDate(a) || new Date(8640000000000000);
+        const bd = parseEventDate(b) || new Date(8640000000000000);
+        return ad - bd;
+    });
+    return relevantEvents;
+}
+
+export { getEventDuration, parseEventDate, orderByRelevantEvents };
