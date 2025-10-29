@@ -1,5 +1,4 @@
 import fs from 'fs/promises';
-import fsSync from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { getEventDuration, parseEventDate, orderByRelevantEvents } from '../filters.js';
@@ -11,9 +10,6 @@ const __dirname=path.dirname(__filename);
 const getAgenda=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'agenda-cache.json');
     try{
-        if (!fsSync.existsSync(filePath)) {
-            return res.status(503).json({ error: 'Agenda aún no está generada.' });
-        }
         const data = await fs.readFile(filePath, 'utf-8');
         let allEvents=JSON.parse(data);
         //Recivimos una queryString con el tiempo y la zona horaria del cliente
@@ -23,6 +19,9 @@ const getAgenda=async (req,res)=>{
         return res.json(relevantEventsResponse);
     }
     catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(503).json({ error: 'Archivo no encontrado.' });
+        }
         console.error('Error en getAgenda:', error);
         return res.status(500).json({ error: 'Error al leer la agenda.' });
     }
@@ -31,14 +30,14 @@ const getAgenda=async (req,res)=>{
 const getRadios=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'radios.json');
     try{
-        if (!fsSync.existsSync(filePath)) {
-            return res.status(503).json({ error: 'Radios aún no está generado.' });
-        }
         const data = await fs.readFile(filePath, 'utf-8');
         const radiosResponse=JSON.parse(data);
         return res.json(radiosResponse);
     }
     catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(503).json({ error: 'Archivo no encontrado.' });
+        }
         console.error('Error en getRadios:', error);
         return res.status(500).json({ error: 'Error al leer radios.' });
     }
@@ -56,10 +55,10 @@ const postRadios=async (req,res)=>{
     };
     try{
         let radios=[];
-        if(fsSync.existsSync(filePath)){
+        //if(fsSync.existsSync(filePath)){
             const fileData=await fs.readFile(filePath, 'utf-8')
             radios=JSON.parse(fileData);
-            }
+        //}
         /*if (radios.find(r => r.id === newRadio.id)) {
             return res.status(409).json({ error: 'Ya existe una radio con ese ID' });
         }*/
@@ -68,6 +67,9 @@ const postRadios=async (req,res)=>{
         return res.status(201).json(newRadio);
     }
     catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(503).json({ error: 'Archivo no encontrado.' });
+        }
         console.error('Error en postRadios:', error);
         return res.status(500).json({ error: 'Error al guardar la nueva radio.' });
     }
@@ -76,14 +78,14 @@ const postRadios=async (req,res)=>{
 const getEventos=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'eventos.json');
     try{
-        if (!fsSync.existsSync(filePath)) {
-            return res.status(503).json({ error: 'Eventos aún no está generado.' });
-        }
         const data =await fs.readFile(filePath, 'utf-8');
         const eventosResponse=JSON.parse(data);
         return res.json(eventosResponse);
     }
     catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(503).json({ error: 'Archivo no encontrado.' });
+        }
         console.error('Error en getEventos:', error);
         return res.status(500).json({ error: 'Error al leer eventos.' });
     }
@@ -92,14 +94,14 @@ const getEventos=async (req,res)=>{
 const getLigas=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'ligas.json');
     try{
-        if (!fsSync.existsSync(filePath)) {
-            return res.status(503).json({ error: 'Ligas aún no está generada.' });
-        }
         const data =await fs.readFile(filePath, 'utf-8');
         const ligasResponse=JSON.parse(data);
         return res.json(ligasResponse);
     }
     catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(503).json({ error: 'Archivo no encontrado.' });
+        }
         console.error('Error en getLigas:', error);
         return res.status(500).json({ error: 'Error al leer ligas.' });
     }
@@ -108,14 +110,14 @@ const getLigas=async (req,res)=>{
 const getNovedades=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'novedades.json');
     try{
-        if (!fsSync.existsSync(filePath)) {
-            return res.status(503).json({ error: 'Novedades aún no está generado.' });
-        }
         const data =await fs.readFile(filePath, 'utf-8');
         const novedadesResponse=JSON.parse(data);
         return res.json(novedadesResponse);
     }
     catch (error) {
+        if (error.code === 'ENOENT') {
+            return res.status(503).json({ error: 'Archivo no encontrado.' });
+        }
         console.error('Error en getNovedades:', error);
         return res.status(500).json({ error: 'Error al leer novedades.' });
     }
