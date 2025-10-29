@@ -17,11 +17,8 @@ const getAgenda=async (req,res)=>{
         const data = await fs.readFile(filePath, 'utf-8');
         let allEvents=JSON.parse(data);
         //Recivimos una queryString con el tiempo y la zona horaria del cliente
-        const clientTimeString=req.query.time;
+        const clientTimeString=req.query.time || new Date().toISOString();
         const clientZoneString=req.query.zone || 'UTC';
-        if(!clientTimeString){
-            return res.json(allEvents);
-        }
         const relevantEventsResponse=orderByRelevantEvents(clientTimeString,clientZoneString, allEvents);
         return res.json(relevantEventsResponse);
     }

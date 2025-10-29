@@ -31,20 +31,29 @@ function parseEventDate(event) {
 }
 
 function orderByRelevantEvents(clientTimeString,clientZoneString, allEvents){
-    //Tenemos que calcular el inicio y fin del día según la zona horaria del cliente
-    const clientDateTime= DateTime.fromISO(clientTimeString, { zone: clientZoneString });
-    if(!clientDateTime.isValid){
-        throw new Error(`Formato de clientTime inválido (${clientDateTime.invalidReason})`);
+    let baseDateTime;
+    let clientTimeZone;
+    if(clientTimeString){
+        //Tenemos que calcular el inicio y fin del día según la zona horaria del cliente
+        const clientDateTime= DateTime.fromISO(clientTimeString, { zone: clientZoneString });
+        if(!clientDateTime.isValid){
+            throw new Error(`Formato de clientTime inválido (${clientDateTime.invalidReason})`);
+        }
+        baseDateTime=clientDateTime;
+        clientTimeZone=clientDateTime.zoneName;
     }
-    const clientTimezone=clientDateTime.zoneName;
-    const now=clientDateTime;
-    const startOfDay= clientDateTime.startOf('day');
-    const endOfDay= clientDateTime.endOf('day');
+    else{
+        baseDateTime=DateTime.utc();
+        clientTimeZone='UTC';
+    }
+    const now=baseDateTime;
+    const startOfDay= baseDateTime.startOf('day');
+    const endOfDay= baseDateTime.endOf('day');
     //Ahora filtramos los eventos que ocurren en ese rango
     const relevantEvents=allEvents.filter(event=>{
         const startTime=parseEventDate(event);
         if(!startTime) return false;
-        const eventStartInClientTZ = DateTime.fromJSDate(startTime, {zone: 'UTC'}).setZone(clientTimezone);
+        const eventStartInClientTZ = DateTime.fromJSDate(startTime, {zone: 'UTC'}).setZone(clientTimeZone);
         if (!eventStartInClientTZ.isValid) return false;
         const durationInMillis=getEventDuration(event.strSport || event.strLeague)
         const eventEndInClientTZ = eventStartInClientTZ.plus({ milliseconds: durationInMillis });
