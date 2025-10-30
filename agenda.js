@@ -5,23 +5,22 @@ import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import { google } from 'googleapis';
+import redisClient from './redisClient.js';
 import dotenv from 'dotenv';
+
 
 dotenv.config();
 
-// ===================================================================================
 // --- CONFIGURACIÓN PRINCIPAL ---
-// ===================================================================================
-
 const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const HOT_SPORTS_YOUTUBE_CHANNEL_ID = "UC4tBHwQc6J2jlXKvL2kpWgQ";
 const HOT_SPORTS_STATION_ID = 'hot_sports'; 
 
-const OUTPUT_FILE_PATH = path.join(__dirname, '..', 'godeanoSportss', 'agenda-cache.json');
-const MANUAL_EVENTS_PATH = path.join(__dirname, '..', 'godeanoSports', 'eventos.json');
-const MANUAL_RADIOS_PATH = path.join(__dirname, '..', 'godeanoSports', 'radios.json');
+const OUTPUT_FILE_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'agenda-cache.json');
+const MANUAL_EVENTS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'eventos.json');
+const MANUAL_RADIOS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'radios.json');
 
 const SUPER7_STATION_ID = 'la_super_7_fm';
 const TUDN_STATION_ID_GENERIC = 'tudn_radio_usa';
@@ -421,9 +420,29 @@ async function fetchAndCacheAgenda() {
     try {
         fs.writeFileSync(OUTPUT_FILE_PATH, JSON.stringify(finalAgenda, null, 2));
         console.log(`\n¡Éxito! Agenda guardada en ${OUTPUT_FILE_PATH}`);
+        try {
+            await redisClient.del('agenda_cache');
+            console.log('🧹 Caché de Redis ("agenda_cache") vaciada exitosamente.');
+        }
+        catch (err) {
+            console.warn('⚠️ No se pudo limpiar la caché de Redis:', err.message);
+        }
     }
     catch (error) {
         console.error("Error al guardar el archivo de agenda:", error);
+    }
+    try {
+        if (redisClient && typeof redisClient.quit === 'function') {
+            await redisClient.quit();
+            console.log('🔒 Conexión Redis cerrada correctamente.');
+        }
+    }
+    catch (err) {
+        console.warn('⚠️ Error al cerrar Redis:', err.message);
+    }
+    finally{
+        console.log('✅ Proceso completado. Cerrando ejecución...');
+        process.exit(0);
     }
 }
 
