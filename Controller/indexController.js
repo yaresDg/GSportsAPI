@@ -1,7 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import redisClient from '../redisClient.js';
 import { getEventDuration, parseEventDate, orderByRelevantEvents } from '../filters.js';
+
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname=path.dirname(__filename);
@@ -10,8 +12,18 @@ const __dirname=path.dirname(__filename);
 const getAgenda=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'agenda-cache.json');
     try{
+        const cacheKey='agenda_cache';
+        const cachedData= await redisClient.get(cacheKey);
+        if (cachedData) {
+            const allEvents = JSON.parse(cachedData);
+            const clientTimeString = req.query.time || new Date().toISOString();
+            const clientZoneString = req.query.zone || 'UTC';
+            const relevantEventsResponse = orderByRelevantEvents(clientTimeString, clientZoneString, allEvents);
+            return res.json(relevantEventsResponse);
+        }
         const data = await fs.readFile(filePath, 'utf-8');
         let allEvents=JSON.parse(data);
+        await redisClient.set(cacheKey, JSON.stringify(allEvents), { EX: 3600 });
         //Recivimos una queryString con el tiempo y la zona horaria del cliente
         const clientTimeString=req.query.time || new Date().toISOString();
         const clientZoneString=req.query.zone || 'UTC';
@@ -30,8 +42,15 @@ const getAgenda=async (req,res)=>{
 const getRadios=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'radios.json');
     try{
+        const cacheKey='radios_cache';
+        const cachedData= await redisClient.get(cacheKey);
+        if(cachedData){
+            const radiosResponse=JSON.parse(cachedData);
+            return res.json(radiosResponse);
+        }
         const data = await fs.readFile(filePath, 'utf-8');
         const radiosResponse=JSON.parse(data);
+        await redisClient.set(cacheKey, JSON.stringify(radiosResponse), { EX: 3600 });
         return res.json(radiosResponse);
     }
     catch (error) {
@@ -78,8 +97,15 @@ const postRadios=async (req,res)=>{
 const getEventos=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'eventos.json');
     try{
+        const cacheKey='eventos_cache';
+        const cachedData= await redisClient.get(cacheKey);
+        if(cachedData){
+            const eventosResponse=JSON.parse(cachedData);
+            return res.json(eventosResponse);
+        }
         const data =await fs.readFile(filePath, 'utf-8');
         const eventosResponse=JSON.parse(data);
+        await redisClient.set(cacheKey, JSON.stringify(eventosResponse), { EX: 3600 });
         return res.json(eventosResponse);
     }
     catch (error) {
@@ -94,8 +120,15 @@ const getEventos=async (req,res)=>{
 const getLigas=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'ligas.json');
     try{
+        const cacheKey='ligas_cache';
+        const cachedData= await redisClient.get(cacheKey);
+        if(cachedData){
+            const ligasResponse=JSON.parse(cachedData);
+            return res.json(ligasResponse);
+        }
         const data =await fs.readFile(filePath, 'utf-8');
         const ligasResponse=JSON.parse(data);
+        await redisClient.set(cacheKey, JSON.stringify(ligasResponse), { EX: 3600 });
         return res.json(ligasResponse);
     }
     catch (error) {
@@ -110,8 +143,15 @@ const getLigas=async (req,res)=>{
 const getNovedades=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'novedades.json');
     try{
+        const cacheKey='novedades_cache';
+        const cachedData= await redisClient.get(cacheKey);
+        if(cachedData){
+            const novedadesResponse=JSON.parse(cachedData);
+            return res.json(novedadesResponse);
+        }
         const data =await fs.readFile(filePath, 'utf-8');
         const novedadesResponse=JSON.parse(data);
+        await redisClient.set(cacheKey, JSON.stringify(novedadesResponse), { EX: 3600 });
         return res.json(novedadesResponse);
     }
     catch (error) {
