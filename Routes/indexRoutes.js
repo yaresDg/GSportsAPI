@@ -9,5 +9,8 @@ router.post('/radios', indexController.postRadios);
 router.get('/eventos', indexController.getEventos);
 router.get('/ligas', indexController.getLigas);
 router.get('/novedades', indexController.getNovedades);
+router.get('/non-spanish-radios', indexController.getRadiosMap);
+router.get('/league-map', indexController.getLeagueMap);
+router.get('/team-map', indexController.getTeamMap);
 
 export default router;
