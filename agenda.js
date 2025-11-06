@@ -1,24 +1,21 @@
-// agenda.js
-// VERSIÓN FINAL Y ROBUSTA v4.8 (Lógica TUDN y Scraper de YouTube corregidos)
-
 import fetch from 'node-fetch';
 import fs from 'fs';
 import path from 'path';
 import { google } from 'googleapis';
 import redisClient from './redisClient.js';
+import mongoose from 'mongoose';
+import connectDb from './db/connection.js';
+import agendaEventModel from './model/agendaEventModel.js';
 import dotenv from 'dotenv';
 
-
 dotenv.config();
+await connectDb();
 
-// --- CONFIGURACIÓN PRINCIPAL ---
 const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const HOT_SPORTS_YOUTUBE_CHANNEL_ID = "UC4tBHwQc6J2jlXKvL2kpWgQ";
 const HOT_SPORTS_STATION_ID = 'hot_sports'; 
-
-const OUTPUT_FILE_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'agenda-cache.json');
 const MANUAL_EVENTS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'eventos.json');
 const MANUAL_RADIOS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'radios.json');
 
@@ -39,10 +36,7 @@ const TUDN_NETWORK_STATIONS = ['kwkw_tu_liga_radio', 'golden_knights_spanish', '
 const MLB_TEAM_IDS_THESPORTSDB = new Set(['135252', '135269', '135256', '135258', '135272', '135273', '135275', '135278', '135279', '135280', '135263', '135264', '135281', '135268', '135260', '135270', '135253', '135251', '135271', '135267', '135265', '135274', '135277', '135276', '135255', '135257', '135259', '135261']);
 const MLB_ID_TO_THESPORTSDB_ID_MAP = { 139: '135263', 112: '135269', 110: '135251', 141: '135265', 134: '135277', 120: '135281', 140: '135264', 121: '135275', 116: '135255', 146: '135273', 147: '135260', 111: '135252', 118: '135257', 143: '135276', 145: '135253', 114: '135254', 109: '135267', 142: '135259', 117: '135256', 144: '135268', 138: '135280', 158: '135274', 115: '135271', 135: '135278', 119: '135272', 137: '135279', 108: '135258', 136: '135260', 113: '135270', 133: '135261' };
 
-// ===================================================================================
-// --- DICCIONARIOS Y AYUDANTES ---
-// ===================================================================================
-
+//DICCIONARIOS Y AYUDANTES
 const F1_GRAND_PRIX_MAP = { "Bahrain Grand Prix": "Gran Premio de Baréin", "Saudi Arabian Grand Prix": "Gran Premio de Arabia Saudita", "Australian Grand Prix": "Gran Premio de Australia", "Japanese Grand Prix": "Gran Premio de Japón", "Chinese Grand Prix": "Gran Premio de China", "Miami Grand Prix": "Gran Premio de Miami", "Emilia Romagna Grand Prix": "Gran Premio de Emilia-Romaña", "Monaco Grand Prix": "Gran Premio de Mónaco", "Canadian Grand Prix": "Gran Premio de Canadá", "Spanish Grand Prix": "Gran Premio de España", "Austrian Grand Prix": "Gran Premio de Austria", "British Grand Prix": "Gran Premio de Gran Bretaña", "Hungarian Grand Prix": "Gran Premio de Hungría", "Belgian Grand Prix": "Gran Premio de Bélgica", "Dutch Grand Prix": "Gran Premio de los Países Bajos", "Italian Grand Prix": "Gran Premio de Italia", "Azerbaijan Grand Prix": "Gran Premio de Azerbaiyán", "Singapore Grand Prix": "Gran Premio de Singapur", "United States Grand Prix": "Gran Premio de los Estados Unidos", "Mexico City Grand Prix": "Gran Premio de la Ciudad de México", "Sao Paulo Grand Prix": "Gran Premio de São Paulo", "Las Vegas Grand Prix": "Gran Premio de Las Vegas", "Qatar Grand Prix": "Gran Premio de Qatar", "Abu Dhabi Grand Prix": "Gran Premio de Abu Dabi" };
 
 function getEventDuration(sport){
@@ -61,7 +55,7 @@ function transformMlbEvent(game){
     const homeTeamId = MLB_ID_TO_THESPORTSDB_ID_MAP[game.teams.home.team.id];
     const awayTeamId = MLB_ID_TO_THESPORTSDB_ID_MAP[game.teams.away.team.id];
     if (!homeTeamId || !awayTeamId) return null;
-    return { idEvent: String(game.gamePk), strEvent: `${game.teams.home.team.name} vs ${game.teams.away.team.name}`, idLeague: "4424", strLeague: "MLB", strHomeTeam: game.teams.home.team.name, strAwayTeam: game.teams.away.team.name, idHomeTeam: homeTeamId, idAwayTeam: awayTeamId, strTimestamp: game.gameDate, dateEvent: game.officialDate, strStatus: game.status.codedGameState };
+    return { idEvent: String(game.gamePk), strEvent: `${game.teams.home.team.name} vs ${game.teams.away.team.name}`, idLeague: "4424", strLeague: "MLB", strHomeTeam: game.teams.home.team.name, strAwayTeam: game.teams.away.team.name, idHomeTeam: homeTeamId, idAwayTeam: awayTeamId, strTimestamp: new Date(game.gameDate).toISOString(), dateEvent: game.officialDate, strStatus: game.status.codedGameState };
 }
 
 async function fetchMlbGames() {
@@ -90,10 +84,7 @@ async function fetchMlbGames() {
     return mlbEvents;
 }
 
-// ===================================================================================
-// --- SCRAPER DE YOUTUBE (VERSIÓN MEJORADA) ---
-// ===================================================================================
-
+//SCRAPER DE YOUTUBE (VERSIÓN MEJORADA)
 async function fetchAndAssignYoutubeStreams(events) {
     console.log("\n--- Iniciando Scraper de YouTube para Hot Sports ---");
     if (!YOUTUBE_API_KEY) {
@@ -153,18 +144,15 @@ async function fetchAndAssignYoutubeStreams(events) {
     return events;
 }
 
-
-// ==========================================================================================
-// --- FUNCIÓN PRINCIPAL ---
-// ==========================================================================================
-
+//FUNCIÓN PRINCIPAL
 async function fetchAndCacheAgenda() {
     if (!THESPORTSDB_API_KEY || !YOUTUBE_API_KEY) {
         console.error("!!! ERROR FATAL: Las claves de API no están configuradas.");
         return;
     }
+    const startTimeOperation=Date.now();
     console.log("Iniciando la obtención de la agenda completa...");
-    // --- FASE 1: OBTENER TODOS LOS EVENTOS (API Y MANUALES) ---
+    //FASE 1: OBTENER TODOS LOS EVENTOS (API Y MANUALES)
     console.log("\n--- Fase 1: Recopilando todos los eventos nuevos de las APIs y archivos locales ---");
     let radiosData;
     try {
@@ -247,15 +235,15 @@ async function fetchAndCacheAgenda() {
     }
     const newUniqueEvents = Array.from(new Map(newlyFetchedEvents.map(e => [e.idEvent, e])).values());
     console.log(`\nSe encontraron ${newUniqueEvents.length} eventos únicos en la nueva búsqueda.`);
-
-    // --- FASE 2: Fusión inteligente con la caché y eventos manuales ---
+    //FASE 2: Fusión inteligente con la caché y eventos manuales
     console.log("\n--- Fase 2: Fusión inteligente de datos ---");
     let oldEventsCache = [];
     try {
-        if (fs.existsSync(OUTPUT_FILE_PATH)) oldEventsCache = JSON.parse(fs.readFileSync(OUTPUT_FILE_PATH, 'utf-8'));
+        oldEventsCache = await agendaEventModel.find({}).lean();
+        console.log(`Se cargaron ${oldEventsCache.length} eventos antiguos desde MongoDB.`);
     }
-    catch (error) {
-        oldEventsCache = [];
+    catch (err) {
+        console.warn("⚠️ No se pudieron cargar eventos previos desde MongoDB:", err.message);
     }
     const updatedTeamIds = new Set();
     newUniqueEvents.forEach(event => {
@@ -273,18 +261,16 @@ async function fetchAndCacheAgenda() {
         if (String(oldEvent.idLeague) === FORMULA1_LEAGUE_ID) return;
         if (updatedTeamIds.has(String(oldEvent.idHomeTeam)) || updatedTeamIds.has(String(oldEvent.idAwayTeam))) return;
         if (oldEvent.manual) return;
-        /* No rescatar eventos manuales de la caché vieja */
+        //No rescatar eventos manuales de la caché vieja
         finalEventsMap.set(oldEvent.idEvent, oldEvent);
         rescuedCount++;
     });
     if (rescuedCount > 0) console.log(`Se rescataron ${rescuedCount} eventos válidos (en curso, etc.) de la caché anterior.`);
-    
     manualEvents.forEach(event => finalEventsMap.set(event.idEvent, event));
-    
     let allUniqueEvents = Array.from(finalEventsMap.values());
     console.log(`Total de eventos después de la fusión: ${allUniqueEvents.length}.`);
 
-    // --- FASE 3: Enriquecimiento de la agenda ---
+    //FASE 3: Enriquecimiento de la agenda
     console.log("\n--- Fase 3: Enriqueciendo la agenda... ---");
     allUniqueEvents.forEach(event => { 
         event.station_ids = new Set(Array.isArray(event.station_ids) ? event.station_ids : []);
@@ -303,7 +289,7 @@ async function fetchAndCacheAgenda() {
         event.station_ids = Array.from(event.station_ids); 
     });
 
-    // --- FASE 4: Limpieza y lógica de asignación ---
+    //FASE 4: Limpieza y lógica de asignación
     const now = new Date();
     let finalEvents = allUniqueEvents.filter(event => {
         if (event.strTimestamp) {
@@ -325,10 +311,10 @@ async function fetchAndCacheAgenda() {
     });
     console.log("Asignación forzada de Super 7 FM a todos los eventos de la MLB completada.");
 
-    // --- FASE 5: Asignación TUDN, Scrapers y Eventos Virtuales ---
+    //FASE 5: Asignación TUDN, Scrapers y Eventos Virtuales
     console.log("\n--- Fase 5: Lógica avanzada de asignación y eventos virtuales ---");
 
-    // --- CORREGIDO: Lógica de la Red TUDN con asignación dual ---
+    //CORREGIDO: Lógica de la Red TUDN con asignación dual
     const conflictWindow = 4 * 60 * 60 * 1000;
     finalEvents.forEach(event => {
         // Solo aplica para la MLB
@@ -365,11 +351,14 @@ async function fetchAndCacheAgenda() {
     
     const virtualEvents = [];
     const todayString = now.toISOString().split('T')[0];
-    const hayChampionsHoy = finalEvents.some(e => e.idLeague === CHAMPIONS_LEAGUE_ID && e.dateEvent === todayString);
+    const hayChampionsHoy = finalEvents.some(e => e.idLeague === CHAMPIONS_LEAGUE_ID && e.dateEvent.trim().startsWith(todayString));
     if (hayChampionsHoy) {
-        const argTime = new Date();
-        argTime.setUTCFullYear(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
-        argTime.setUTCHours(19, 0, 0, 0);
+        const argTime = new Date(Date.UTC(
+            now.getUTCFullYear(),
+            now.getUTCMonth(),
+            now.getUTCDate(),
+            19, 0, 0, 0
+        ));
         virtualEvents.push({ idEvent: "virtual-2", strEvent: "Champions League en español", strLeague: "UEFA Champions League", strHomeTeam: "Champions League en español", strAwayTeam: "", strTimestamp: argTime.toISOString(), station_ids: CHAMPIONS_LEAGUE_STATION_IDS, idLeague: CHAMPIONS_LEAGUE_ID });
         console.log("Evento virtual de Champions League creado porque hay partidos hoy."); }
         else {
@@ -377,7 +366,7 @@ async function fetchAndCacheAgenda() {
         }
 
     try {
-        const cubanGamesToday = finalEvents.filter(e => String(e.idLeague) === CUBAN_LEAGUE_ID && e.dateEvent === todayString);
+        const cubanGamesToday = finalEvents.filter(e => String(e.idLeague) === CUBAN_LEAGUE_ID && e.dateEvent.trim().startsWith(todayString));
         if (cubanGamesToday.length >= 3) {
             const gameTimes = {};
             cubanGamesToday.forEach(game => {
@@ -397,7 +386,7 @@ async function fetchAndCacheAgenda() {
             if (broadcastTime) {
                 virtualEvents.push({
                     idEvent: "virtual-3", strEvent: "Béisbol Rebelde", strLeague: "Serie Nacional Cubana",
-                    strHomeTeam: "Béisbol Rebelde", strAwayTeam: "", strTimestamp: broadcastTime,
+                    strHomeTeam: "Béisbol Rebelde", strAwayTeam: "", strTimestamp: new Date(broadcastTime).toISOString(),
                     station_ids: [RADIO_REBELDE_STATION_ID],
                     idLeague: CUBAN_LEAGUE_ID,
                 });
@@ -418,11 +407,13 @@ async function fetchAndCacheAgenda() {
     let finalAgenda = [...finalEvents, ...virtualEvents].filter(event => event.station_ids && event.station_ids.length > 0);
     console.log(`Agenda final generada con ${finalAgenda.length} eventos con transmisión confirmada.`);
     try {
-        fs.writeFileSync(OUTPUT_FILE_PATH, JSON.stringify(finalAgenda, null, 2));
-        console.log(`\n¡Éxito! Agenda guardada en ${OUTPUT_FILE_PATH}`);
+        await agendaEventModel.deleteMany();
+        console.log('Base de datos limpiada.');
+        await agendaEventModel.insertMany(finalAgenda);
+        console.log(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
         try {
             await redisClient.del('agenda_cache');
-            console.log('🧹 Caché de Redis ("agenda_cache") vaciada exitosamente.');
+            console.log('Caché de Redis ("agenda_cache") vaciada exitosamente.');
         }
         catch (err) {
             console.warn('⚠️ No se pudo limpiar la caché de Redis:', err.message);
@@ -434,14 +425,27 @@ async function fetchAndCacheAgenda() {
     try {
         if (redisClient && typeof redisClient.quit === 'function') {
             await redisClient.quit();
-            console.log('🔒 Conexión Redis cerrada correctamente.');
+            console.log('Conexión Redis cerrada correctamente.');
         }
     }
     catch (err) {
         console.warn('⚠️ Error al cerrar Redis:', err.message);
     }
+    try {
+        await mongoose.connection.close();
+        console.log('Conexión a MongoDB cerrada correctamente.');
+    }
+    catch (err) {
+        console.warn('⚠️ Error al cerrar MongoDB:', err.message);
+    }
     finally{
-        console.log('✅ Proceso completado. Cerrando ejecución...');
+        const endTimeOperation=Date.now();
+        const totalMs= endTimeOperation - startTimeOperation;
+        const totalSeconds=Math.floor(totalMs / 1000);
+        const minutes=Math.floor(totalSeconds / 60);
+        const seconds= totalSeconds % 60;
+        console.log(`Operación completada en ${minutes} minutos y ${seconds} segundos`)
+        console.log('Proceso completado. Cerrando ejecución...');
         process.exit(0);
     }
 }
