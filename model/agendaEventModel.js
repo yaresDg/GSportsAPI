@@ -168,9 +168,10 @@ const AgendaEventSchema = new mongoose.Schema({
   strLocked: {
     type: String
   },
-  station_ids: [{
-    type: String
-  }]
+  station_ids: {
+    type: [mongoose.Schema.Types.Mixed],
+    default: []
+  }
 }, {
   collection: 'agendaEvents'
 });
