@@ -22,9 +22,9 @@ function parseEventDate(event) {
     if (!ts) return null;
 
     // Normalizar TODAS las fechas a UTC para evitar ambigüedades
-    /*if (!/Z$|[+-]\d{2}:?\d{2}$/.test(ts)) {
+    if (!/Z$|[+-]\d{2}:?\d{2}$/.test(ts)) {
         ts += 'Z';
-    }*/
+    }
     
     const d = new Date(ts);
     return isNaN(d.getTime()) ? null : d;
