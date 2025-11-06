@@ -1,6 +1,7 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import AgendaEvent from '../model/agendaEventModel.js';
 import redisClient from '../redisClient.js';
 import { getEventDuration, parseEventDate, orderByRelevantEvents } from '../filters.js';
 
@@ -10,19 +11,17 @@ const __dirname=path.dirname(__filename);
 
 
 const getAgenda=async (req,res)=>{
-    const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'agenda-cache.json');
     try{
         const cacheKey='agenda_cache';
-        const cachedData= await redisClient.get(cacheKey);
+        /*const cachedData= await redisClient.get(cacheKey);
         if (cachedData) {
             const allEvents = JSON.parse(cachedData);
             const clientTimeString = req.query.time || new Date().toISOString();
             const clientZoneString = req.query.zone || 'UTC';
             const relevantEventsResponse = orderByRelevantEvents(clientTimeString, clientZoneString, allEvents);
             return res.json(relevantEventsResponse);
-        }
-        const data = await fs.readFile(filePath, 'utf-8');
-        let allEvents=JSON.parse(data);
+        }*/
+        let allEvents=await AgendaEvent.find({}).lean();
         await redisClient.set(cacheKey, JSON.stringify(allEvents), { EX: 3600 });
         //Recivimos una queryString con el tiempo y la zona horaria del cliente
         const clientTimeString=req.query.time || new Date().toISOString();
@@ -31,9 +30,6 @@ const getAgenda=async (req,res)=>{
         return res.json(relevantEventsResponse);
     }
     catch (error) {
-        if (error.code === 'ENOENT') {
-            return res.status(503).json({ error: 'Archivo no encontrado.' });
-        }
         console.error('Error en getAgenda:', error);
         return res.status(500).json({ error: 'Error al leer la agenda.' });
     }
