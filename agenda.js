@@ -170,6 +170,16 @@ async function fetchAndCacheAgenda() {
             console.log(`Se cargaron ${manualEvents.length} eventos desde eventos.json.`);
             
             manualEvents.forEach(event => {
+                if (Array.isArray(event.station_ids)) {
+                    event.station_ids.forEach(station => {
+                        if (typeof station === 'object' && station !== null && station.id) {
+                            if (!radiosData.some(r => r.id === station.id)) {
+                                radiosData.push(station);
+                                console.log(`Inyectada radio "inline" (${station.id}) del evento "${event.strEvent}"`);
+                            }
+                        }
+                    });
+                }
                 if (event.inline_radios && Array.isArray(event.inline_radios)) {
                     radiosData.push(...event.inline_radios);
                     console.log(`Inyectadas ${event.inline_radios.length} radios "inline" del evento "${event.strEvent}"`);
@@ -272,21 +282,27 @@ async function fetchAndCacheAgenda() {
 
     //FASE 3: Enriquecimiento de la agenda
     console.log("\n--- Fase 3: Enriqueciendo la agenda... ---");
-    allUniqueEvents.forEach(event => { 
-        event.station_ids = new Set(Array.isArray(event.station_ids) ? event.station_ids : []);
+    allUniqueEvents.forEach(event => {
+        const existingStations = new Set(Array.isArray(event.station_ids) ? event.station_ids.map(s => typeof s === 'object' ? s.id : s) : []);
+
         if (event.manual_station_ids && Array.isArray(event.manual_station_ids)) {
-            event.manual_station_ids.forEach(id => event.station_ids.add(id));
+            event.manual_station_ids.forEach(id => existingStations.add(id));
         }
+
         const homeId = String(event.idHomeTeam);
         const awayId = String(event.idAwayTeam);
-        const leagueId = String(event.idLeague); 
+        const leagueId = String(event.idLeague);
+
         radiosData.forEach(station => {
             const stationIds = (Array.isArray(station.id_thesportsdb) ? station.id_thesportsdb : [station.id_thesportsdb]).map(String);
             if (stationIds.includes(homeId) || stationIds.includes(awayId) || stationIds.includes(leagueId)) {
-                event.station_ids.add(station.id);
+                if (!existingStations.has(station.id)) {
+                    if (!Array.isArray(event.station_ids)) event.station_ids = [];
+                    event.station_ids.push(station.id);
+                    existingStations.add(station.id);
+                }
             }
-        }); 
-        event.station_ids = Array.from(event.station_ids); 
+        });
     });
 
     //FASE 4: Limpieza y lógica de asignación
@@ -317,31 +333,29 @@ async function fetchAndCacheAgenda() {
     //CORREGIDO: Lógica de la Red TUDN con asignación dual
     const conflictWindow = 4 * 60 * 60 * 1000;
     finalEvents.forEach(event => {
-        // Solo aplica para la MLB
         if (String(event.idLeague) === '4424') {
-            
-            // Intenta asignar UNA radio de la cola de TUDN a CADA partido de MLB
+            const currentStationIds = event.station_ids.map(s => typeof s === 'object' ? s.id : s);
+
             for (const tudnStationId of TUDN_NETWORK_STATIONS) {
-                // Condición 1: ¿Esta radio específica ya está en el partido? Si es así, no la añadimos de nuevo.
-                // Esto evita duplicados y permite que WRTO (local) coexista con otra de la red (nacional).
-                if (event.station_ids.includes(tudnStationId)) {
-                    continue; // Ya la tiene, probamos la siguiente de la cola.
+                if (currentStationIds.includes(tudnStationId)) {
+                    continue;
                 }
-                // Condición 2: ¿Esta radio está ocupada por otro partido en un horario conflictivo?
+
                 let isBusy = false;
                 for (const otherEvent of finalEvents) {
+                    const otherStationIds = otherEvent.station_ids.map(s => typeof s === 'object' ? s.id : s);
                     if (otherEvent.idEvent !== event.idEvent &&
-                        otherEvent.station_ids.includes(tudnStationId) &&
+                        otherStationIds.includes(tudnStationId) &&
                         Math.abs(new Date(event.strTimestamp) - new Date(otherEvent.strTimestamp)) < conflictWindow) {
                         isBusy = true;
                         break;
                     }
                 }
-                // Si no está ocupada, la asignamos y TERMINAMOS de buscar para ESTE partido.
+
                 if (!isBusy) {
                     event.station_ids.push(tudnStationId);
                     console.log(`Asignando TUDN de respaldo "${tudnStationId}" al partido "${event.strEvent}"`);
-                    break; // ¡Importante! Evita que se asignen MÚLTIPLES radios de respaldo al mismo partido.
+                    break;
                 }
             }
         }
@@ -351,7 +365,7 @@ async function fetchAndCacheAgenda() {
     
     const virtualEvents = [];
     const todayString = now.toISOString().split('T')[0];
-    const hayChampionsHoy = finalEvents.some(e => e.idLeague === CHAMPIONS_LEAGUE_ID && e.dateEvent.trim().startsWith(todayString));
+    const hayChampionsHoy = finalEvents.some(e => e.idLeague === CHAMPIONS_LEAGUE_ID && e.dateEvent && e.dateEvent.trim().startsWith(todayString));
     if (hayChampionsHoy) {
         const argTime = new Date(Date.UTC(
             now.getUTCFullYear(),
@@ -366,7 +380,7 @@ async function fetchAndCacheAgenda() {
         }
 
     try {
-        const cubanGamesToday = finalEvents.filter(e => String(e.idLeague) === CUBAN_LEAGUE_ID && e.dateEvent.trim().startsWith(todayString));
+        const cubanGamesToday = finalEvents.filter(e => String(e.idLeague) === CUBAN_LEAGUE_ID && e.dateEvent && e.dateEvent.trim().startsWith(todayString));
         if (cubanGamesToday.length >= 3) {
             const gameTimes = {};
             cubanGamesToday.forEach(game => {
@@ -409,7 +423,7 @@ async function fetchAndCacheAgenda() {
     try {
         await agendaEventModel.deleteMany();
         console.log('Base de datos limpiada.');
-        await agendaEventModel.insertMany(finalAgenda);
+        await agendaEventModel.insertMany(finalAgenda, { ordered: false });
         console.log(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
         try {
             await redisClient.del('agenda_cache');
@@ -420,7 +434,7 @@ async function fetchAndCacheAgenda() {
         }
     }
     catch (error) {
-        console.error("Error al guardar el archivo de agenda:", error);
+        console.error("Error al guardar la agenda en MongoDB:", error.message);
     }
     try {
         if (redisClient && typeof redisClient.quit === 'function') {
