@@ -16,7 +16,7 @@ function updateAgenda(){
         logToFile('=== Iniciando actualización de agenda ===');
         try {
             await fetchAndCacheAgenda();
-            logToFile('✅ Agenda actualizada correctamente.');
+            logToFile('Agenda actualizada correctamente.');
         }
         catch (error) {
             logToFile(`❌ Error al actualizar agenda: ${error.message}`);

@@ -17,6 +17,7 @@ const HOT_SPORTS_YOUTUBE_CHANNEL_ID = "UC4tBHwQc6J2jlXKvL2kpWgQ";
 const HOT_SPORTS_STATION_ID = 'hot_sports'; 
 const MANUAL_EVENTS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'eventos.json');
 const MANUAL_RADIOS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'radios.json');
+const logPath = path.resolve(process.cwd(), 'agenda.log');
 
 const SUPER7_STATION_ID = 'la_super_7_fm';
 const TUDN_STATION_ID_GENERIC = 'tudn_radio_usa';
@@ -161,22 +162,28 @@ async function deleteKeysByPattern(pattern) {
     console.log(`Se eliminaron ${totalDeleted} claves que coinciden con "${pattern}"`);
 }
 
+function logToFile(message) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] ${message}\n`;
+  fs.appendFileSync(logPath, logMessage);
+}
+
 //FUNCIÓN PRINCIPAL
 async function fetchAndCacheAgenda() {
     if (!THESPORTSDB_API_KEY || !YOUTUBE_API_KEY) {
-        console.error("!!! ERROR FATAL: Las claves de API no están configuradas.");
+        logToFile("!!! ERROR FATAL: Las claves de API no están configuradas.");
         return;
     }
     const startTimeOperation=Date.now();
-    console.log("Iniciando la obtención de la agenda completa...");
+    logToFile("Iniciando la obtención de la agenda completa...");
     //FASE 1: OBTENER TODOS LOS EVENTOS (API Y MANUALES)
-    console.log("\n--- Fase 1: Recopilando todos los eventos nuevos de las APIs y archivos locales ---");
+    logToFile("\n--- Fase 1: Recopilando todos los eventos nuevos de las APIs y archivos locales ---");
     let radiosData;
     try {
         radiosData = JSON.parse(fs.readFileSync(MANUAL_RADIOS_PATH, 'utf-8'));
     }
     catch (error) {
-        console.error("!!! ERROR FATAL: No se pudo leer 'radios.json'.", error.message);
+        logToFile("!!! ERROR FATAL: No se pudo leer 'radios.json'.", error.message);
         return;
     }
     
@@ -184,7 +191,7 @@ async function fetchAndCacheAgenda() {
     try {
         if (fs.existsSync(MANUAL_EVENTS_PATH)) {
             manualEvents = JSON.parse(fs.readFileSync(MANUAL_EVENTS_PATH, 'utf-8'));
-            console.log(`Se cargaron ${manualEvents.length} eventos desde eventos.json.`);
+            logToFile(`Se cargaron ${manualEvents.length} eventos desde eventos.json.`);
             
             manualEvents.forEach(event => {
                 if (Array.isArray(event.station_ids)) {
@@ -192,20 +199,20 @@ async function fetchAndCacheAgenda() {
                         if (typeof station === 'object' && station !== null && station.id) {
                             if (!radiosData.some(r => r.id === station.id)) {
                                 radiosData.push(station);
-                                console.log(`Inyectada radio "inline" (${station.id}) del evento "${event.strEvent}"`);
+                                logToFile(`Inyectada radio "inline" (${station.id}) del evento "${event.strEvent}"`);
                             }
                         }
                     });
                 }
                 if (event.inline_radios && Array.isArray(event.inline_radios)) {
                     radiosData.push(...event.inline_radios);
-                    console.log(`Inyectadas ${event.inline_radios.length} radios "inline" del evento "${event.strEvent}"`);
+                    logPath(`Inyectadas ${event.inline_radios.length} radios "inline" del evento "${event.strEvent}"`);
                 }
             });
         }
     }
     catch (error) {
-        console.error("Error al cargar o procesar eventos.json:", error.message);
+        logPath("Error al cargar o procesar eventos.json:", error.message);
     }
 
     const newlyFetchedEvents = [];
@@ -221,9 +228,9 @@ async function fetchAndCacheAgenda() {
         });
     });
     const teamsArray = Array.from(teamsToFetch).map(id => ({ id }));
-    console.log(`Se buscarán los partidos de ${teamsArray.length} equipos (no MLB, no F1) en TheSportsDB.`);
+    logToFile(`Se buscarán los partidos de ${teamsArray.length} equipos (no MLB, no F1) en TheSportsDB.`);
     for (const [index, team] of teamsArray.entries()) {
-        console.log(`(${index + 1}/${teamsArray.length}) Buscando para el equipo ID: ${team.id}`);
+        logToFile(`(${index + 1}/${teamsArray.length}) Buscando para el equipo ID: ${team.id}`);
         const url = `https://www.thesportsdb.com/api/v1/json/${THESPORTSDB_API_KEY}/eventsnext.php?id=${team.id}`;
         try {
             const response = await fetch(url);
@@ -234,12 +241,12 @@ async function fetchAndCacheAgenda() {
             }
         }
         catch (error) {
-            console.error(`Error de red para el equipo ${team.id}:`, error.message);
+            logToFile(`Error de red para el equipo ${team.id}:`, error.message);
         }
         await sleep(2100);
     }
     try {
-        console.log("Buscando próximos eventos de Fórmula 1 (búsqueda dedicada)...");
+        logToFile("Buscando próximos eventos de Fórmula 1 (búsqueda dedicada)...");
         const f1Url = `https://www.thesportsdb.com/api/v1/json/${THESPORTSDB_API_KEY}/eventsnext.php?id=${F1_TEAM_ID_FOR_SCHEDULE}`;
         const response = await fetch(f1Url);
         const data = await response.json();
@@ -250,27 +257,27 @@ async function fetchAndCacheAgenda() {
             });
         if (f1Races.length > 0) {
             newlyFetchedEvents.push(...f1Races);
-            console.log(`Se añadieron ${f1Races.length} carreras de Fórmula 1 (Grand Prix) al listado.`);
+            logToFile(`Se añadieron ${f1Races.length} carreras de Fórmula 1 (Grand Prix) al listado.`);
         }
         else {
-            console.log("No se encontró ninguna carrera de F1 (Grand Prix) en los próximos eventos.");
+            logToFile("No se encontró ninguna carrera de F1 (Grand Prix) en los próximos eventos.");
         }
         }
     }
     catch (error) {
-        console.error("Error de red al buscar eventos de Fórmula 1:", error.message);
+        logToFile("Error de red al buscar eventos de Fórmula 1:", error.message);
     }
     const newUniqueEvents = Array.from(new Map(newlyFetchedEvents.map(e => [e.idEvent, e])).values());
     console.log(`\nSe encontraron ${newUniqueEvents.length} eventos únicos en la nueva búsqueda.`);
     //FASE 2: Fusión inteligente con la caché y eventos manuales
-    console.log("\n--- Fase 2: Fusión inteligente de datos ---");
+    logToFile("\n--- Fase 2: Fusión inteligente de datos ---");
     let oldEventsCache = [];
     try {
         oldEventsCache = await agendaEventModel.find({}).lean();
-        console.log(`Se cargaron ${oldEventsCache.length} eventos antiguos desde MongoDB.`);
+        logToFile(`Se cargaron ${oldEventsCache.length} eventos antiguos desde MongoDB.`);
     }
     catch (err) {
-        console.warn("⚠️ No se pudieron cargar eventos previos desde MongoDB:", err.message);
+        logToFile("⚠️ No se pudieron cargar eventos previos desde MongoDB:", err.message);
     }
     const updatedTeamIds = new Set();
     newUniqueEvents.forEach(event => {
@@ -279,7 +286,7 @@ async function fetchAndCacheAgenda() {
             if (event.idAwayTeam) updatedTeamIds.add(String(event.idAwayTeam));
         }
     });
-    console.log(`Se ha obtenido información fresca para ${updatedTeamIds.size} equipos de TheSportsDB.`);
+    logToFile(`Se ha obtenido información fresca para ${updatedTeamIds.size} equipos de TheSportsDB.`);
     const finalEventsMap = new Map();
     newUniqueEvents.forEach(event => finalEventsMap.set(event.idEvent, event));
     let rescuedCount = 0;
@@ -295,13 +302,11 @@ async function fetchAndCacheAgenda() {
     if (rescuedCount > 0) console.log(`Se rescataron ${rescuedCount} eventos válidos (en curso, etc.) de la caché anterior.`);
     manualEvents.forEach(event => finalEventsMap.set(event.idEvent, event));
     let allUniqueEvents = Array.from(finalEventsMap.values());
-    console.log(`Total de eventos después de la fusión: ${allUniqueEvents.length}.`);
-
+    logToFile(`Total de eventos después de la fusión: ${allUniqueEvents.length}.`);
     //FASE 3: Enriquecimiento de la agenda
-    console.log("\n--- Fase 3: Enriqueciendo la agenda... ---");
+    logToFile("\n--- Fase 3: Enriqueciendo la agenda... ---");
     allUniqueEvents.forEach(event => {
         const existingStations = new Set(Array.isArray(event.station_ids) ? event.station_ids.map(s => typeof s === 'object' ? s.id : s) : []);
-
         if (event.manual_station_ids && Array.isArray(event.manual_station_ids)) {
             event.manual_station_ids.forEach(id => existingStations.add(id));
         }
@@ -342,11 +347,9 @@ async function fetchAndCacheAgenda() {
             }
         }
     });
-    console.log("Asignación forzada de Super 7 FM a todos los eventos de la MLB completada.");
-
+    logToFile("Asignación forzada de Super 7 FM a todos los eventos de la MLB completada.");
     //FASE 5: Asignación TUDN, Scrapers y Eventos Virtuales
-    console.log("\n--- Fase 5: Lógica avanzada de asignación y eventos virtuales ---");
-
+    logToFile("\n--- Fase 5: Lógica avanzada de asignación y eventos virtuales ---");
     //CORREGIDO: Lógica de la Red TUDN con asignación dual
     const conflictWindow = 4 * 60 * 60 * 1000;
     finalEvents.forEach(event => {
@@ -371,7 +374,7 @@ async function fetchAndCacheAgenda() {
 
                 if (!isBusy) {
                     event.station_ids.push(tudnStationId);
-                    console.log(`Asignando TUDN de respaldo "${tudnStationId}" al partido "${event.strEvent}"`);
+                    logToFile(`Asignando TUDN de respaldo "${tudnStationId}" al partido "${event.strEvent}"`);
                     break;
                 }
             }
@@ -391,9 +394,9 @@ async function fetchAndCacheAgenda() {
             19, 0, 0, 0
         ));
         virtualEvents.push({ idEvent: "virtual-2", strEvent: "Champions League en español", strLeague: "UEFA Champions League", strHomeTeam: "Champions League en español", strAwayTeam: "", strTimestamp: argTime.toISOString(), station_ids: CHAMPIONS_LEAGUE_STATION_IDS, idLeague: CHAMPIONS_LEAGUE_ID });
-        console.log("Evento virtual de Champions League creado porque hay partidos hoy."); }
+        logToFile("Evento virtual de Champions League creado porque hay partidos hoy."); }
         else {
-            console.log("No se crea evento virtual de Champions League porque no hay partidos hoy.");
+            logToFile("No se crea evento virtual de Champions League porque no hay partidos hoy.");
         }
 
     try {
@@ -421,38 +424,38 @@ async function fetchAndCacheAgenda() {
                     station_ids: [RADIO_REBELDE_STATION_ID],
                     idLeague: CUBAN_LEAGUE_ID,
                 });
-                console.log(`Evento virtual 'Béisbol Rebelde' creado a las ${new Date(broadcastTime).toUTCString()} (UTC) al haber ${gameTimes[broadcastTime]} partidos simultáneos.`);
+                logToFile(`Evento virtual 'Béisbol Rebelde' creado a las ${new Date(broadcastTime).toUTCString()} (UTC) al haber ${gameTimes[broadcastTime]} partidos simultáneos.`);
             }
             else {
-                console.log("No se crea evento virtual 'Béisbol Rebelde': no hay 3 o más partidos simultáneos hoy.");
+                logToFile("No se crea evento virtual 'Béisbol Rebelde': no hay 3 o más partidos simultáneos hoy.");
             }
         }
         else {
-            console.log("No se crea evento virtual 'Béisbol Rebelde': no hay suficientes partidos de la liga cubana hoy.");
+            logToFile("No se crea evento virtual 'Béisbol Rebelde': no hay suficientes partidos de la liga cubana hoy.");
         }
     }
     catch(err) {
-        console.warn("Error evaluando Béisbol Rebelde:", err);
+        logToFile("Error evaluando Béisbol Rebelde:", err);
     }
     
     let finalAgenda = [...finalEvents, ...virtualEvents].filter(event => event.station_ids && event.station_ids.length > 0);
-    console.log(`Agenda final generada con ${finalAgenda.length} eventos con transmisión confirmada.`);
+    logToFile(`Agenda final generada con ${finalAgenda.length} eventos con transmisión confirmada.`);
     try {
         await agendaEventModel.deleteMany();
-        console.log('Base de datos limpiada.');
+        logToFile('Base de datos limpiada.');
         await agendaEventModel.insertMany(finalAgenda, { ordered: false });
-        console.log(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
+        logToFile(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
         try {
             await redisClient.del('agenda_cache');
-            console.log('Caché de Redis ("agenda_cache") vaciada exitosamente.');
+            logToFile('Caché de Redis ("agenda_cache") vaciada exitosamente.');
             await deleteKeysByPattern('agenda_event_*');
         }
         catch (err) {
-            console.warn('⚠️ No se pudo limpiar la caché de Redis:', err.message);
+            logToFile('⚠️ No se pudo limpiar la caché de Redis:', err.message);
         }
     }
     catch (error) {
-        console.error("Error al guardar la agenda en MongoDB:", error.message);
+        logToFile("Error al guardar la agenda en MongoDB:", error.message);
     }
     finally{
         const endTimeOperation=Date.now();
@@ -460,8 +463,8 @@ async function fetchAndCacheAgenda() {
         const totalSeconds=Math.floor(totalMs / 1000);
         const minutes=Math.floor(totalSeconds / 60);
         const seconds= totalSeconds % 60;
-        console.log(`Operación completada en ${minutes} minutos y ${seconds} segundos`)
-        console.log('Proceso completado');
+        logToFile(`Operación completada en ${minutes} minutos y ${seconds} segundos`)
+        logToFile('Proceso completado');
     }
 }
 
