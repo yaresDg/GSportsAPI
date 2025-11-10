@@ -1,41 +1,12 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import AgendaEvent from '../model/agendaEventModel.js';
-import redisClient from '../redisClient.js';
-import { getEventDuration, parseEventDate, orderByRelevantEvents } from '../filters.js';
+
 
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname=path.dirname(__filename);
 
-
-const getAgenda=async (req,res)=>{
-    try{
-        const cacheKey='agenda_cache';
-        const cachedData= await redisClient.get(cacheKey);
-        if (cachedData) {
-            const allEvents = JSON.parse(cachedData);
-            const clientTimeString = req.query.time || new Date().toISOString();
-            const clientZoneString = req.query.zone || 'UTC';
-            const relevantEventsResponse = orderByRelevantEvents(clientTimeString, clientZoneString, allEvents);
-            console.log('Leyendo datos de redis...');
-            return res.json(relevantEventsResponse);
-        }
-        console.log('Cache vacio. Lellendo la base de datos...');
-        let allEvents=await AgendaEvent.find({},{__v: 0}).lean();
-        await redisClient.set(cacheKey, JSON.stringify(allEvents), { EX: 3600 });
-        //Recivimos una queryString con el tiempo y la zona horaria del cliente
-        const clientTimeString=req.query.time || new Date().toISOString();
-        const clientZoneString=req.query.zone || 'UTC';
-        const relevantEventsResponse=orderByRelevantEvents(clientTimeString,clientZoneString, allEvents);
-        return res.json(relevantEventsResponse);
-    }
-    catch (error) {
-        console.error('Error en getAgenda:', error);
-        return res.status(500).json({ error: 'Error al leer la agenda.' });
-    }
-}
 
 const getRadios=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'radios.json');
@@ -230,4 +201,4 @@ const getTeamMap=async (req,res)=>{
     }
 }
 
-export default { getAgenda, getRadios, postRadios, getEventos, getLigas, getNovedades, getRadiosMap, getLeagueMap, getTeamMap };
+export default {  getRadios, postRadios, getEventos, getLigas, getNovedades, getRadiosMap, getLeagueMap, getTeamMap };

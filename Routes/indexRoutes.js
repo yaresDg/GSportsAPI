@@ -1,9 +1,11 @@
 import { Router } from "express";
 import indexController from "../Controller/indexController.js";
+import agendaController from "../Controller/agendaController.js";
 
 const router=Router();
 
-router.get('/agenda', indexController.getAgenda);
+router.get('/agenda', agendaController.getAgenda);
+router.get('/agenda/:id', agendaController.getAgendaById);
 router.get('/radios', indexController.getRadios);
 router.post('/radios', indexController.postRadios);
 router.get('/eventos', indexController.getEventos);

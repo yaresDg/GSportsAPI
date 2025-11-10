@@ -144,6 +144,24 @@ async function fetchAndAssignYoutubeStreams(events) {
     return events;
 }
 
+async function deleteKeysByPattern(pattern) {
+    let cursor = '0';
+    let totalDeleted = 0;
+    do {
+        const { cursor: nextCursor, keys } = await redisClient.scan(cursor, {
+            MATCH: pattern,
+            COUNT: 100
+        });
+        cursor = nextCursor;
+        if (keys.length > 0) {
+            await redisClient.del(keys);
+            totalDeleted += keys.length;
+        }
+    }
+    while (cursor !== '0');
+    console.log(`Se eliminaron ${totalDeleted} claves que coinciden con "${pattern}"`);
+}
+
 //FUNCIÓN PRINCIPAL
 async function fetchAndCacheAgenda() {
     if (!THESPORTSDB_API_KEY || !YOUTUBE_API_KEY) {
@@ -428,6 +446,7 @@ async function fetchAndCacheAgenda() {
         try {
             await redisClient.del('agenda_cache');
             console.log('Caché de Redis ("agenda_cache") vaciada exitosamente.');
+            await deleteKeysByPattern('agenda_event_*');
         }
         catch (err) {
             console.warn('⚠️ No se pudo limpiar la caché de Redis:', err.message);
