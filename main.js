@@ -5,6 +5,7 @@ import cors from 'cors';
 import compression from 'compression';
 import indexRoutes from './Routes/indexRoutes.js';
 import connectDb from './db/connection.js';
+import updateAgenda from './tarea.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -22,5 +23,6 @@ app.use('/',indexRoutes);
 connectDb().then(()=>{
     app.listen(port,()=>{
         console.log(`Server is running at http://localhost:${port}`);
+        updateAgenda();
     });
 });

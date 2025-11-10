@@ -9,7 +9,6 @@ import agendaEventModel from './model/agendaEventModel.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
-await connectDb();
 
 const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
@@ -455,22 +454,6 @@ async function fetchAndCacheAgenda() {
     catch (error) {
         console.error("Error al guardar la agenda en MongoDB:", error.message);
     }
-    try {
-        if (redisClient && typeof redisClient.quit === 'function') {
-            await redisClient.quit();
-            console.log('Conexión Redis cerrada correctamente.');
-        }
-    }
-    catch (err) {
-        console.warn('⚠️ Error al cerrar Redis:', err.message);
-    }
-    try {
-        await mongoose.connection.close();
-        console.log('Conexión a MongoDB cerrada correctamente.');
-    }
-    catch (err) {
-        console.warn('⚠️ Error al cerrar MongoDB:', err.message);
-    }
     finally{
         const endTimeOperation=Date.now();
         const totalMs= endTimeOperation - startTimeOperation;
@@ -478,9 +461,8 @@ async function fetchAndCacheAgenda() {
         const minutes=Math.floor(totalSeconds / 60);
         const seconds= totalSeconds % 60;
         console.log(`Operación completada en ${minutes} minutos y ${seconds} segundos`)
-        console.log('Proceso completado. Cerrando ejecución...');
-        process.exit(0);
+        console.log('Proceso completado');
     }
 }
 
-fetchAndCacheAgenda();
+export default fetchAndCacheAgenda;
