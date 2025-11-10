@@ -1,6 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import redisClient from '../redisClient.js';
+
 
 
 const __filename = fileURLToPath(import.meta.url);
