@@ -9,15 +9,15 @@ import agendaEventModel from './model/agendaEventModel.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
+await connectDb();
 
 const THESPORTSDB_API_KEY = process.env.THESPORTSDB_API_KEY;
 const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const HOT_SPORTS_YOUTUBE_CHANNEL_ID = "UC4tBHwQc6J2jlXKvL2kpWgQ";
-const HOT_SPORTS_STATION_ID = 'hot_sports'; 
+const HOT_SPORTS_STATION_ID = 'hot_sports';
 const MANUAL_EVENTS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'eventos.json');
 const MANUAL_RADIOS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'radios.json');
-const logPath = path.resolve(process.cwd(), 'agenda.log');
 
 const SUPER7_STATION_ID = 'la_super_7_fm';
 const TUDN_STATION_ID_GENERIC = 'tudn_radio_usa';
@@ -40,16 +40,16 @@ const MLB_ID_TO_THESPORTSDB_ID_MAP = { 139: '135263', 112: '135269', 110: '13525
 const F1_GRAND_PRIX_MAP = { "Bahrain Grand Prix": "Gran Premio de Baréin", "Saudi Arabian Grand Prix": "Gran Premio de Arabia Saudita", "Australian Grand Prix": "Gran Premio de Australia", "Japanese Grand Prix": "Gran Premio de Japón", "Chinese Grand Prix": "Gran Premio de China", "Miami Grand Prix": "Gran Premio de Miami", "Emilia Romagna Grand Prix": "Gran Premio de Emilia-Romaña", "Monaco Grand Prix": "Gran Premio de Mónaco", "Canadian Grand Prix": "Gran Premio de Canadá", "Spanish Grand Prix": "Gran Premio de España", "Austrian Grand Prix": "Gran Premio de Austria", "British Grand Prix": "Gran Premio de Gran Bretaña", "Hungarian Grand Prix": "Gran Premio de Hungría", "Belgian Grand Prix": "Gran Premio de Bélgica", "Dutch Grand Prix": "Gran Premio de los Países Bajos", "Italian Grand Prix": "Gran Premio de Italia", "Azerbaijan Grand Prix": "Gran Premio de Azerbaiyán", "Singapore Grand Prix": "Gran Premio de Singapur", "United States Grand Prix": "Gran Premio de los Estados Unidos", "Mexico City Grand Prix": "Gran Premio de la Ciudad de México", "Sao Paulo Grand Prix": "Gran Premio de São Paulo", "Las Vegas Grand Prix": "Gran Premio de Las Vegas", "Qatar Grand Prix": "Gran Premio de Qatar", "Abu Dhabi Grand Prix": "Gran Premio de Abu Dabi" };
 
 function getEventDuration(sport){
-    const sportType = sport || ""; 
-    if (sportType.includes('Soccer') || sportType.includes('Champions')) return 2.5 * 60 * 60 * 1000; 
+    const sportType = sport || "";
+    if (sportType.includes('Soccer') || sportType.includes('Champions')) return 2.5 * 60 * 60 * 1000;
     if (sportType.includes('Basketball')) return 3 * 60 * 60 * 1000;
-    if (sportType.includes('Baseball') || sportType.includes('MLB')) return 3.5 * 60 * 60 * 1000;  
-    return 4 * 60 * 60 * 1000; 
+    if (sportType.includes('Baseball') || sportType.includes('MLB')) return 3.5 * 60 * 60 * 1000;
+    return 4 * 60 * 60 * 1000;
 }
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function normalizeText(text){
     if (!text) return '';
-    return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/vs\.?|@|en vivo|directo/g, ''); 
+    return text.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/vs\.?|@|en vivo|directo/g, '');
 }
 function transformMlbEvent(game){
     const homeTeamId = MLB_ID_TO_THESPORTSDB_ID_MAP[game.teams.home.team.id];
@@ -77,7 +77,7 @@ async function fetchMlbGames() {
             }
         }
         catch (error) {
-            console.error(`Error de red al buscar en la API de la MLB (${url}):`, error.message);
+            console.log(`Error de red al buscar en la API de la MLB (${url}):`, error.message);
         }
     }
     console.log(`Se encontraron ${mlbEvents.length} partidos de la MLB para hoy y mañana.`);
@@ -88,7 +88,7 @@ async function fetchMlbGames() {
 async function fetchAndAssignYoutubeStreams(events) {
     console.log("\n--- Iniciando Scraper de YouTube para Hot Sports ---");
     if (!YOUTUBE_API_KEY) {
-        console.warn("ADVERTENCIA: No se proporcionó YOUTUBE_API_KEY. Saltando scraper de YouTube.");
+        console.log("ADVERTENCIA: No se proporcionó YOUTUBE_API_KEY. Saltando scraper de YouTube.");
         return events;
     }
     try {
@@ -106,25 +106,20 @@ async function fetchAndAssignYoutubeStreams(events) {
             return events;
         }
         console.log(`Hot Sports: Se encontraron ${upcomingStreams.length} streams programados. Analizando títulos...`);
-        // Función interna para obtener el nombre clave de un equipo de MLB
         const getMlbShortName = (fullTeamName) => {
             if (!fullTeamName) return null;
             const normalized = normalizeText(fullTeamName);
-            // Casos especiales de dos palabras
             if (normalized.includes("blue jays")) return "blue jays";
             if (normalized.includes("red sox")) return "red sox";
             if (normalized.includes("white sox")) return "white sox";
-            // Caso general: tomar la última palabra (funciona para "Brewers", "Cubs", "Yankees", etc.)
             return normalized.split(' ').pop();
         };
         upcomingStreams.forEach(stream => {
             const normalizedTitle = normalizeText(stream.snippet.title);
             for (const event of events) {
-                // Solo aplicar a partidos de la MLB
                 if (String(event.idLeague) !== '4424') continue;
                 const homeShortName = getMlbShortName(event.strHomeTeam);
                 const awayShortName = getMlbShortName(event.strAwayTeam);
-                // Comprobar si el título contiene AMBOS nombres clave
                 if (homeShortName && awayShortName && normalizedTitle.includes(homeShortName) && normalizedTitle.includes(awayShortName)) {
                     if (!Array.isArray(event.station_ids)) {
                         event.station_ids = [];
@@ -132,14 +127,14 @@ async function fetchAndAssignYoutubeStreams(events) {
                     if (!event.station_ids.includes(HOT_SPORTS_STATION_ID)) {
                         event.station_ids.push(HOT_SPORTS_STATION_ID);
                         console.log(`--> Coincidencia encontrada: Asignando Hot Sports al partido "${event.strEvent}" basado en el título de YouTube: "${stream.snippet.title}"`);
-                        break; // Partido asignado, pasar al siguiente stream de YouTube
+                        break;
                     }
                 }
             }
         });
     }
     catch (error) {
-        console.error("!!! ERROR en el scraper de YouTube para Hot Sports:", error.message);
+        console.log("!!! ERROR en el scraper de YouTube para Hot Sports:", error.message);
     }
     return events;
 }
@@ -162,28 +157,22 @@ async function deleteKeysByPattern(pattern) {
     console.log(`Se eliminaron ${totalDeleted} claves que coinciden con "${pattern}"`);
 }
 
-function logToFile(message) {
-  const timestamp = new Date().toISOString();
-  const logMessage = `[${timestamp}] ${message}\n`;
-  fs.appendFileSync(logPath, logMessage);
-}
-
 //FUNCIÓN PRINCIPAL
 async function fetchAndCacheAgenda() {
     if (!THESPORTSDB_API_KEY || !YOUTUBE_API_KEY) {
-        logToFile("!!! ERROR FATAL: Las claves de API no están configuradas.");
+        console.log("!!! ERROR FATAL: Las claves de API no están configuradas.");
         return;
     }
     const startTimeOperation=Date.now();
-    logToFile("Iniciando la obtención de la agenda completa...");
+    console.log("Iniciando la obtención de la agenda completa...");
     //FASE 1: OBTENER TODOS LOS EVENTOS (API Y MANUALES)
-    logToFile("\n--- Fase 1: Recopilando todos los eventos nuevos de las APIs y archivos locales ---");
+    console.log("\n--- Fase 1: Recopilando todos los eventos nuevos de las APIs y archivos locales ---");
     let radiosData;
     try {
         radiosData = JSON.parse(fs.readFileSync(MANUAL_RADIOS_PATH, 'utf-8'));
     }
     catch (error) {
-        logToFile("!!! ERROR FATAL: No se pudo leer 'radios.json'.", error.message);
+        console.log(`!!! ERROR FATAL: No se pudo leer 'radios.json'. ${error.message}`);
         return;
     }
     
@@ -191,7 +180,7 @@ async function fetchAndCacheAgenda() {
     try {
         if (fs.existsSync(MANUAL_EVENTS_PATH)) {
             manualEvents = JSON.parse(fs.readFileSync(MANUAL_EVENTS_PATH, 'utf-8'));
-            logToFile(`Se cargaron ${manualEvents.length} eventos desde eventos.json.`);
+            console.log(`Se cargaron ${manualEvents.length} eventos desde eventos.json.`);
             
             manualEvents.forEach(event => {
                 if (Array.isArray(event.station_ids)) {
@@ -199,20 +188,20 @@ async function fetchAndCacheAgenda() {
                         if (typeof station === 'object' && station !== null && station.id) {
                             if (!radiosData.some(r => r.id === station.id)) {
                                 radiosData.push(station);
-                                logToFile(`Inyectada radio "inline" (${station.id}) del evento "${event.strEvent}"`);
+                                console.log(`Inyectada radio "inline" (${station.id}) del evento "${event.strEvent}"`);
                             }
                         }
                     });
                 }
                 if (event.inline_radios && Array.isArray(event.inline_radios)) {
                     radiosData.push(...event.inline_radios);
-                    logPath(`Inyectadas ${event.inline_radios.length} radios "inline" del evento "${event.strEvent}"`);
+                    console.log(`Inyectadas ${event.inline_radios.length} radios "inline" del evento "${event.strEvent}"`);
                 }
             });
         }
     }
     catch (error) {
-        logPath("Error al cargar o procesar eventos.json:", error.message);
+        console.log(`Error al cargar o procesar eventos.json: ${error.message}`);
     }
 
     const newlyFetchedEvents = [];
@@ -228,9 +217,9 @@ async function fetchAndCacheAgenda() {
         });
     });
     const teamsArray = Array.from(teamsToFetch).map(id => ({ id }));
-    logToFile(`Se buscarán los partidos de ${teamsArray.length} equipos (no MLB, no F1) en TheSportsDB.`);
+    console.log(`Se buscarán los partidos de ${teamsArray.length} equipos (no MLB, no F1) en TheSportsDB.`);
     for (const [index, team] of teamsArray.entries()) {
-        logToFile(`(${index + 1}/${teamsArray.length}) Buscando para el equipo ID: ${team.id}`);
+        console.log(`(${index + 1}/${teamsArray.length}) Buscando para el equipo ID: ${team.id}`);
         const url = `https://www.thesportsdb.com/api/v1/json/${THESPORTSDB_API_KEY}/eventsnext.php?id=${team.id}`;
         try {
             const response = await fetch(url);
@@ -241,12 +230,12 @@ async function fetchAndCacheAgenda() {
             }
         }
         catch (error) {
-            logToFile(`Error de red para el equipo ${team.id}:`, error.message);
+            console.log(`Error de red para el equipo ${team.id}: ${error.message}`);
         }
         await sleep(2100);
     }
     try {
-        logToFile("Buscando próximos eventos de Fórmula 1 (búsqueda dedicada)...");
+        console.log("Buscando próximos eventos de Fórmula 1 (búsqueda dedicada)...");
         const f1Url = `https://www.thesportsdb.com/api/v1/json/${THESPORTSDB_API_KEY}/eventsnext.php?id=${F1_TEAM_ID_FOR_SCHEDULE}`;
         const response = await fetch(f1Url);
         const data = await response.json();
@@ -255,29 +244,28 @@ async function fetchAndCacheAgenda() {
                 raceEvent.strEvent = F1_GRAND_PRIX_MAP[raceEvent.strEvent] || raceEvent.strEvent;
                 return raceEvent;
             });
-        if (f1Races.length > 0) {
-            newlyFetchedEvents.push(...f1Races);
-            logToFile(`Se añadieron ${f1Races.length} carreras de Fórmula 1 (Grand Prix) al listado.`);
-        }
-        else {
-            logToFile("No se encontró ninguna carrera de F1 (Grand Prix) en los próximos eventos.");
-        }
+            if (f1Races.length > 0) {
+                newlyFetchedEvents.push(...f1Races);
+                console.log(`Se añadieron ${f1Races.length} carreras de Fórmula 1 (Grand Prix) al listado.`);
+            }
+            else {
+                console.log("No se encontró ninguna carrera de F1 (Grand Prix) en los próximos eventos.");
+            }
         }
     }
     catch (error) {
-        logToFile("Error de red al buscar eventos de Fórmula 1:", error.message);
+        console.log(`Error de red al buscar eventos de Fórmula 1: ${error.message}`);
     }
     const newUniqueEvents = Array.from(new Map(newlyFetchedEvents.map(e => [e.idEvent, e])).values());
     console.log(`\nSe encontraron ${newUniqueEvents.length} eventos únicos en la nueva búsqueda.`);
-    //FASE 2: Fusión inteligente con la caché y eventos manuales
-    logToFile("\n--- Fase 2: Fusión inteligente de datos ---");
+    console.log("\n--- Fase 2: Fusión inteligente de datos ---");
     let oldEventsCache = [];
     try {
         oldEventsCache = await agendaEventModel.find({}).lean();
-        logToFile(`Se cargaron ${oldEventsCache.length} eventos antiguos desde MongoDB.`);
+        console.log(`Se cargaron ${oldEventsCache.length} eventos antiguos desde MongoDB.`);
     }
     catch (err) {
-        logToFile("⚠️ No se pudieron cargar eventos previos desde MongoDB:", err.message);
+        console.log(`⚠️ No se pudieron cargar eventos previos desde MongoDB: ${err.message}`);
     }
     const updatedTeamIds = new Set();
     newUniqueEvents.forEach(event => {
@@ -286,7 +274,7 @@ async function fetchAndCacheAgenda() {
             if (event.idAwayTeam) updatedTeamIds.add(String(event.idAwayTeam));
         }
     });
-    logToFile(`Se ha obtenido información fresca para ${updatedTeamIds.size} equipos de TheSportsDB.`);
+    console.log(`Se ha obtenido información fresca para ${updatedTeamIds.size} equipos de TheSportsDB.`);
     const finalEventsMap = new Map();
     newUniqueEvents.forEach(event => finalEventsMap.set(event.idEvent, event));
     let rescuedCount = 0;
@@ -295,26 +283,22 @@ async function fetchAndCacheAgenda() {
         if (String(oldEvent.idLeague) === FORMULA1_LEAGUE_ID) return;
         if (updatedTeamIds.has(String(oldEvent.idHomeTeam)) || updatedTeamIds.has(String(oldEvent.idAwayTeam))) return;
         if (oldEvent.manual) return;
-        //No rescatar eventos manuales de la caché vieja
         finalEventsMap.set(oldEvent.idEvent, oldEvent);
         rescuedCount++;
     });
     if (rescuedCount > 0) console.log(`Se rescataron ${rescuedCount} eventos válidos (en curso, etc.) de la caché anterior.`);
     manualEvents.forEach(event => finalEventsMap.set(event.idEvent, event));
     let allUniqueEvents = Array.from(finalEventsMap.values());
-    logToFile(`Total de eventos después de la fusión: ${allUniqueEvents.length}.`);
-    //FASE 3: Enriquecimiento de la agenda
-    logToFile("\n--- Fase 3: Enriqueciendo la agenda... ---");
+    console.log(`Total de eventos después de la fusión: ${allUniqueEvents.length}.`);
+    console.log("\n--- Fase 3: Enriqueciendo la agenda... ---");
     allUniqueEvents.forEach(event => {
         const existingStations = new Set(Array.isArray(event.station_ids) ? event.station_ids.map(s => typeof s === 'object' ? s.id : s) : []);
         if (event.manual_station_ids && Array.isArray(event.manual_station_ids)) {
             event.manual_station_ids.forEach(id => existingStations.add(id));
         }
-
         const homeId = String(event.idHomeTeam);
         const awayId = String(event.idAwayTeam);
         const leagueId = String(event.idLeague);
-
         radiosData.forEach(station => {
             const stationIds = (Array.isArray(station.id_thesportsdb) ? station.id_thesportsdb : [station.id_thesportsdb]).map(String);
             if (stationIds.includes(homeId) || stationIds.includes(awayId) || stationIds.includes(leagueId)) {
@@ -326,8 +310,7 @@ async function fetchAndCacheAgenda() {
             }
         });
     });
-
-    //FASE 4: Limpieza y lógica de asignación
+    console.log("\n--- Fase 4: Limpieza y lógica de asignación ---");
     const now = new Date();
     let finalEvents = allUniqueEvents.filter(event => {
         if (event.strTimestamp) {
@@ -347,20 +330,16 @@ async function fetchAndCacheAgenda() {
             }
         }
     });
-    logToFile("Asignación forzada de Super 7 FM a todos los eventos de la MLB completada.");
-    //FASE 5: Asignación TUDN, Scrapers y Eventos Virtuales
-    logToFile("\n--- Fase 5: Lógica avanzada de asignación y eventos virtuales ---");
-    //CORREGIDO: Lógica de la Red TUDN con asignación dual
+    console.log("Asignación forzada de Super 7 FM a todos los eventos de la MLB completada.");
+    console.log("\n--- Fase 5: Lógica avanzada de asignación y eventos virtuales ---");
     const conflictWindow = 4 * 60 * 60 * 1000;
     finalEvents.forEach(event => {
         if (String(event.idLeague) === '4424') {
             const currentStationIds = event.station_ids.map(s => typeof s === 'object' ? s.id : s);
-
             for (const tudnStationId of TUDN_NETWORK_STATIONS) {
                 if (currentStationIds.includes(tudnStationId)) {
                     continue;
                 }
-
                 let isBusy = false;
                 for (const otherEvent of finalEvents) {
                     const otherStationIds = otherEvent.station_ids.map(s => typeof s === 'object' ? s.id : s);
@@ -371,10 +350,9 @@ async function fetchAndCacheAgenda() {
                         break;
                     }
                 }
-
                 if (!isBusy) {
                     event.station_ids.push(tudnStationId);
-                    logToFile(`Asignando TUDN de respaldo "${tudnStationId}" al partido "${event.strEvent}"`);
+                    console.log(`Asignando TUDN de respaldo "${tudnStationId}" al partido "${event.strEvent}"`);
                     break;
                 }
             }
@@ -382,7 +360,6 @@ async function fetchAndCacheAgenda() {
     });
 
     finalEvents = await fetchAndAssignYoutubeStreams(finalEvents);
-    
     const virtualEvents = [];
     const todayString = now.toISOString().split('T')[0];
     const hayChampionsHoy = finalEvents.some(e => e.idLeague === CHAMPIONS_LEAGUE_ID && e.dateEvent && e.dateEvent.trim().startsWith(todayString));
@@ -394,10 +371,10 @@ async function fetchAndCacheAgenda() {
             19, 0, 0, 0
         ));
         virtualEvents.push({ idEvent: "virtual-2", strEvent: "Champions League en español", strLeague: "UEFA Champions League", strHomeTeam: "Champions League en español", strAwayTeam: "", strTimestamp: argTime.toISOString(), station_ids: CHAMPIONS_LEAGUE_STATION_IDS, idLeague: CHAMPIONS_LEAGUE_ID });
-        logToFile("Evento virtual de Champions League creado porque hay partidos hoy."); }
-        else {
-            logToFile("No se crea evento virtual de Champions League porque no hay partidos hoy.");
-        }
+        console.log("Evento virtual de Champions League creado porque hay partidos hoy.");
+    } else {
+        console.log("No se crea evento virtual de Champions League porque no hay partidos hoy.");
+    }
 
     try {
         const cubanGamesToday = finalEvents.filter(e => String(e.idLeague) === CUBAN_LEAGUE_ID && e.dateEvent && e.dateEvent.trim().startsWith(todayString));
@@ -424,48 +401,60 @@ async function fetchAndCacheAgenda() {
                     station_ids: [RADIO_REBELDE_STATION_ID],
                     idLeague: CUBAN_LEAGUE_ID,
                 });
-                logToFile(`Evento virtual 'Béisbol Rebelde' creado a las ${new Date(broadcastTime).toUTCString()} (UTC) al haber ${gameTimes[broadcastTime]} partidos simultáneos.`);
+                console.log(`Evento virtual 'Béisbol Rebelde' creado a las ${new Date(broadcastTime).toUTCString()} (UTC) al haber ${gameTimes[broadcastTime]} partidos simultáneos.`);
+            } else {
+                console.log("No se crea evento virtual 'Béisbol Rebelde': no hay 3 o más partidos simultáneos hoy.");
             }
-            else {
-                logToFile("No se crea evento virtual 'Béisbol Rebelde': no hay 3 o más partidos simultáneos hoy.");
-            }
-        }
-        else {
-            logToFile("No se crea evento virtual 'Béisbol Rebelde': no hay suficientes partidos de la liga cubana hoy.");
+        } else {
+            console.log("No se crea evento virtual 'Béisbol Rebelde': no hay suficientes partidos de la liga cubana hoy.");
         }
     }
     catch(err) {
-        logToFile("Error evaluando Béisbol Rebelde:", err);
+        console.log(`Error evaluando Béisbol Rebelde: ${err}`);
     }
-    
     let finalAgenda = [...finalEvents, ...virtualEvents].filter(event => event.station_ids && event.station_ids.length > 0);
-    logToFile(`Agenda final generada con ${finalAgenda.length} eventos con transmisión confirmada.`);
+    console.log(`Agenda final generada con ${finalAgenda.length} eventos con transmisión confirmada.`);
     try {
         await agendaEventModel.deleteMany();
-        logToFile('Base de datos limpiada.');
+        console.log('Base de datos limpiada.');
         await agendaEventModel.insertMany(finalAgenda, { ordered: false });
-        logToFile(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
+        console.log(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
         try {
             await redisClient.del('agenda_cache');
-            logToFile('Caché de Redis ("agenda_cache") vaciada exitosamente.');
+            console.log('Caché de Redis ("agenda_cache") vaciada exitosamente.');
             await deleteKeysByPattern('agenda_event_*');
         }
         catch (err) {
-            logToFile('⚠️ No se pudo limpiar la caché de Redis:', err.message);
+            console.log(`⚠️ No se pudo limpiar la caché de Redis: ${err.message}`);
         }
     }
     catch (error) {
-        logToFile("Error al guardar la agenda en MongoDB:", error.message);
+        console.log(`Error al guardar la agenda en MongoDB: ${error.message}`);
     }
     finally{
+        try {
+            if (redisClient && typeof redisClient.quit === 'function') {
+                await redisClient.quit();
+                console.log('Conexión Redis cerrada correctamente.');
+            }
+        } catch (err) {
+            console.log(`⚠️ Error al cerrar Redis: ${err.message}`);
+        }
+        try {
+            await mongoose.connection.close();
+            console.log('Conexión a MongoDB cerrada correctamente.');
+        } catch (err) {
+            console.log(`⚠️ Error al cerrar MongoDB: ${err.message}`);
+        }
         const endTimeOperation=Date.now();
         const totalMs= endTimeOperation - startTimeOperation;
         const totalSeconds=Math.floor(totalMs / 1000);
         const minutes=Math.floor(totalSeconds / 60);
         const seconds= totalSeconds % 60;
-        logToFile(`Operación completada en ${minutes} minutos y ${seconds} segundos`)
-        logToFile('Proceso completado');
+        console.log(`Operación completada en ${minutes} minutos y ${seconds} segundos`);
+        console.log('Proceso completado. Cerrando ejecución...');
+        process.exit(0);
     }
 }
 
-export default fetchAndCacheAgenda;
+fetchAndCacheAgenda();
