@@ -25,7 +25,11 @@ const RadioSchema = new mongoose.Schema(
     streams: {
       type: [String],
       default: []
-    }
+    },
+    external_only: {
+  type: Boolean,
+  default: false
+}
   },
   {
     timestamps: true
