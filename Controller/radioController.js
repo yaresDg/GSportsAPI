@@ -26,7 +26,7 @@ const getRadios=async (req,res)=>{
     }
     catch (error) {
         console.error('Error en getRadios:', error);
-        return res.status(500).json({ error: 'Error al leer radios.' });
+        return res.status(500).json({ error: 'Error al leer radios' });
     }
 }
 
@@ -80,7 +80,7 @@ const postRadio=async (req,res)=>{
     }
     catch (error) {
         console.error('Error en postRadios:', error);
-        return res.status(500).json({ error: 'Error al guardar la nueva radio.' });
+        return res.status(500).json({ error: 'Error al guardar la nueva radio' });
     }
 }
 
@@ -106,7 +106,7 @@ const putRadio=async (req,res)=>{
     }
     catch(error){
         console.error('Error en putRadio:', error);
-        return res.status(500).json({ error: 'Error al actualizar la radio.' });
+        return res.status(500).json({ error: 'Error al actualizar la radio' });
     }
 }
 
@@ -127,7 +127,7 @@ const deleteRadio=async (req,res)=>{
     }
     catch(error){
         console.error('Error en deleteRadio:', error);
-        return res.status(500).json({ error: 'Error al eliminar la radio.' });
+        return res.status(500).json({ error: 'Error al eliminar la radio' });
     }
 }
 
