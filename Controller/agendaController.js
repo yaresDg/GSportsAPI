@@ -14,14 +14,14 @@ const getAgenda=async (req,res)=>{
             if (cachedData) {
                 const allEvents = JSON.parse(cachedData);
                 const relevantEventsResponse = orderByRelevantEvents(clientTimeString, clientZoneString, allEvents);
-                console.log('Leyendo datos de redis...');
+                console.log('Leyendo datos de redis');
                 return res.json(relevantEventsResponse);
             }
         }
         catch(redisError){
             console.warn('Error en Redis:', redisError);
         }
-        console.log('Caché vacío. Leyendo la base de datos...');
+        console.log('Caché vacío. Leyendo la base de datos');
         let allEvents=await AgendaEvent.find({},{__v: 0}).lean();
         try{
             await redisClient.set(cacheKey, JSON.stringify(allEvents), { EX: 3600 });

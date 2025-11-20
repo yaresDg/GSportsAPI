@@ -2,6 +2,7 @@ import { Router } from "express";
 import indexController from "../Controller/indexController.js";
 import agendaController from "../Controller/agendaController.js";
 import radioController from "../Controller/radioController.js";
+import eventController from "../Controller/eventController.js";
 
 const router=Router();
 
@@ -16,7 +17,14 @@ router.post('/radios', radioController.postRadio);
 router.put('/radios/:id', radioController.putRadio);
 router.delete('/radios/:id', radioController.deleteRadio);
 
-router.get('/eventos', indexController.getEventos);
+//eventController
+router.get('/eventos', eventController.getManualEvents);
+router.get('/eventos/:id', eventController.getManualEventById);
+router.post('/eventos', eventController.postManualEvent);
+router.put('/eventos/:id', eventController.putManualEvent);
+router.delete('/eventos/:id', eventController.deleteManualEvent);
+
+//Para actualizar en el futuro
 router.get('/ligas', indexController.getLigas);
 router.get('/novedades', indexController.getNovedades);
 router.get('/non-spanish-radios', indexController.getRadiosMap);

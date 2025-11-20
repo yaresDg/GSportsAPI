@@ -4,7 +4,7 @@ import redisClient from '../redisClient.js';
 
 const getManualEvents=async (req,res)=>{
     try{
-        const cacheKey='eventos_cache';
+        const cacheKey='manualEvents_cache';
         try{
             const cachedData= await redisClient.get(cacheKey);
             if(cachedData){
@@ -34,7 +34,7 @@ const getManualEventById=async(req,res)=>{
     const eventId=req.params.id;
     if (!mongoose.Types.ObjectId.isValid(eventId)) return res.status(404).json({'message': 'not found'});
     try{
-        const cacheKey=`evento_${eventId}`;
+        const cacheKey=`manualEvent_${eventId}`;
         try{
             const cachedData=await redisClient.get(cacheKey);
             if (cachedData) {
@@ -71,7 +71,7 @@ const postManualEvent=async (req,res)=>{
         await newManualEvent.validate();
         const savedEvent= await newManualEvent.save();
         try{
-            await redisClient.del('eventos_cache');
+            await redisClient.del('manualEvents_cache');
         }
         catch(redisError){
             console.warn('Error en Redis:', redisError);
@@ -95,9 +95,9 @@ const putManualEvent=async (req,res)=>{
         { new: true, runValidators: true, projection: { __v: 0 } }).lean();
         if(!updatedEvent) return res.status(404).json({'message': 'not found'});
         try{
-            await redisClient.del('eventos_cache');
-            await redisClient.del(`evento_${eventId}`);
-            await redisClient.set(`evento_${eventId}`, JSON.stringify(updatedEvent), { EX: 3600 });
+            await redisClient.del('manualEvents_cache');
+            await redisClient.del(`manualEvent_${eventId}`);
+            await redisClient.set(`manualEvent_${eventId}`, JSON.stringify(updatedEvent), { EX: 3600 });
         }
         catch(redisError){
             console.warn('Error en Redis:', redisError);
@@ -117,8 +117,8 @@ const deleteManualEvent=async (req,res)=>{
         const deletedEvent=await ManualEvent.findByIdAndDelete(eventId, { projection: { __v: 0, createdAt: 0, updatedAt: 0 }}).lean();
         if(!deletedEvent) return res.status(404).json({'message': 'not found'});
         try{
-            await redisClient.del('eventos_cache');
-            await redisClient.del(`evento_${eventId}`);
+            await redisClient.del('manualEvents_cache');
+            await redisClient.del(`manualEvent_${eventId}`);
         }
         catch(redisError){
             console.warn('Error en Redis:', redisError);
