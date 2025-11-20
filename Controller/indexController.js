@@ -124,4 +124,4 @@ const getTeamMap=async (req,res)=>{
     }
 }
 
-export default {  getRadios, postRadios, getEventos, getLigas, getNovedades, getRadiosMap, getLeagueMap, getTeamMap };
+export default { getLigas, getNovedades, getRadiosMap, getLeagueMap, getTeamMap };
