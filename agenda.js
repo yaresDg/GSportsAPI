@@ -1,11 +1,11 @@
 import fetch from 'node-fetch';
-import fs from 'fs';
-import path from 'path';
 import { google } from 'googleapis';
 import redisClient from './redisClient.js';
 import mongoose from 'mongoose';
 import connectDb from './db/connection.js';
 import agendaEventModel from './model/agendaEventModel.js';
+import ManualEvent from './model/manualEventModel.js';
+import Radio from './model/radioModel.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -16,8 +16,6 @@ const YOUTUBE_API_KEY = process.env.YOUTUBE_API_KEY;
 
 const HOT_SPORTS_YOUTUBE_CHANNEL_ID = "UC4tBHwQc6J2jlXKvL2kpWgQ";
 const HOT_SPORTS_STATION_ID = 'hot_sports';
-const MANUAL_EVENTS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'eventos.json');
-const MANUAL_RADIOS_PATH = path.resolve(process.cwd(), '..', 'godeanoSports', 'radios.json');
 
 const SUPER7_STATION_ID = 'la_super_7_fm';
 const TUDN_STATION_ID_GENERIC = 'tudn_radio_usa';
@@ -169,39 +167,38 @@ async function fetchAndCacheAgenda() {
     console.log("\n--- Fase 1: Recopilando todos los eventos nuevos de las APIs y archivos locales ---");
     let radiosData;
     try {
-        radiosData = JSON.parse(fs.readFileSync(MANUAL_RADIOS_PATH, 'utf-8'));
+        radiosData = await Radio.find({}).lean();
+        console.log(`Se cargaron ${radiosData.length} radios desde la base de datos`)
     }
     catch (error) {
-        console.log(`!!! ERROR FATAL: No se pudo leer 'radios.json'. ${error.message}`);
+        console.log(`Error: no se pudieron cargar las radios de la base de datos: ${error.message}`);
         return;
     }
     
     let manualEvents = [];
     try {
-        if (fs.existsSync(MANUAL_EVENTS_PATH)) {
-            manualEvents = JSON.parse(fs.readFileSync(MANUAL_EVENTS_PATH, 'utf-8'));
-            console.log(`Se cargaron ${manualEvents.length} eventos desde eventos.json.`);
-            
-            manualEvents.forEach(event => {
-                if (Array.isArray(event.station_ids)) {
-                    event.station_ids.forEach(station => {
-                        if (typeof station === 'object' && station !== null && station.id) {
-                            if (!radiosData.some(r => r.id === station.id)) {
-                                radiosData.push(station);
-                                console.log(`Inyectada radio "inline" (${station.id}) del evento "${event.strEvent}"`);
-                            }
+        manualEvents = await ManualEvent.find({}).lean();
+        console.log(`Se cargaron ${manualEvents.length} eventos desde la base de datos`);
+        
+        manualEvents.forEach(event => {
+            if (Array.isArray(event.station_ids)) {
+                event.station_ids.forEach(station => {
+                    if (typeof station === 'object' && station !== null && station.id) {
+                        if (!radiosData.some(r => r.id === station.id)) {
+                            radiosData.push(station);
+                            console.log(`Inyectada radio "inline" (${station.id}) del evento "${event.strEvent}"`);
                         }
-                    });
-                }
-                if (event.inline_radios && Array.isArray(event.inline_radios)) {
-                    radiosData.push(...event.inline_radios);
-                    console.log(`Inyectadas ${event.inline_radios.length} radios "inline" del evento "${event.strEvent}"`);
-                }
-            });
-        }
+                    }
+                });
+            }
+            if (event.inline_radios && Array.isArray(event.inline_radios)) {
+                radiosData.push(...event.inline_radios);
+                console.log(`Inyectadas ${event.inline_radios.length} radios "inline" del evento "${event.strEvent}"`);
+            }
+        });
     }
     catch (error) {
-        console.log(`Error al cargar o procesar eventos.json: ${error.message}`);
+        console.log(`Error al cargar los eventos de la base de datos: ${error.message}`);
     }
 
     const newlyFetchedEvents = [];
