@@ -83,7 +83,7 @@ async function fetchMlbGames() {
 }
 
 //SCRAPER DE YOUTUBE (VERSIÓN MEJORADA)
-async function fetchAndAssignYoutubeStreams(events) {
+/*async function fetchAndAssignYoutubeStreams(events) {
     console.log("\n--- Iniciando Scraper de YouTube para Hot Sports ---");
     if (!YOUTUBE_API_KEY) {
         console.log("ADVERTENCIA: No se proporcionó YOUTUBE_API_KEY. Saltando scraper de YouTube.");
@@ -135,7 +135,7 @@ async function fetchAndAssignYoutubeStreams(events) {
         console.log("!!! ERROR en el scraper de YouTube para Hot Sports:", error.message);
     }
     return events;
-}
+}*/
 
 async function deleteKeysByPattern(pattern) {
     let cursor = '0';
@@ -355,8 +355,7 @@ async function fetchAndCacheAgenda() {
             }
         }
     });
-
-    finalEvents = await fetchAndAssignYoutubeStreams(finalEvents);
+    //finalEvents = await fetchAndAssignYoutubeStreams(finalEvents);
     const virtualEvents = [];
     const todayString = now.toISOString().split('T')[0];
     const hayChampionsHoy = finalEvents.some(e => e.idLeague === CHAMPIONS_LEAGUE_ID && e.dateEvent && e.dateEvent.trim().startsWith(todayString));
