@@ -15,7 +15,7 @@ const getUpdates=async (req,res)=>{
         catch(redisError){
             console.warn('Error en Redis:', redisError);
         }
-        const news = await Update.find({},{__v: 0}).lean();
+        const news = await Update.find({},{__v: 0}).sort({fecha: -1}).lean();
         try{
             await redisClient.set(cacheKey, JSON.stringify(news), { EX: 3600 });
         }

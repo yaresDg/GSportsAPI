@@ -32,29 +32,6 @@ const getLigas=async (req,res)=>{
     }
 }
 
-const getNovedades=async (req,res)=>{
-    const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'novedades.json');
-    try{
-        const cacheKey='novedades_cache';
-        const cachedData= await redisClient.get(cacheKey);
-        if(cachedData){
-            const novedadesResponse=JSON.parse(cachedData);
-            return res.json(novedadesResponse);
-        }
-        const data =await fs.readFile(filePath, 'utf-8');
-        const novedadesResponse=JSON.parse(data);
-        await redisClient.set(cacheKey, JSON.stringify(novedadesResponse), { EX: 3600 });
-        return res.json(novedadesResponse);
-    }
-    catch (error) {
-        if (error.code === 'ENOENT') {
-            return res.status(503).json({ error: 'Archivo no encontrado.' });
-        }
-        console.error('Error en getNovedades:', error);
-        return res.status(500).json({ error: 'Error al leer novedades.' });
-    }
-}
-
 const getRadiosMap=async (req,res)=>{
     const filePath = path.join(__dirname, '..', '..', 'godeanoSports', 'non-spanish-radios.json');
     try{
@@ -124,4 +101,4 @@ const getTeamMap=async (req,res)=>{
     }
 }
 
-export default { getLigas, getNovedades, getRadiosMap, getLeagueMap, getTeamMap };
+export default { getLigas, getRadiosMap, getLeagueMap, getTeamMap };
