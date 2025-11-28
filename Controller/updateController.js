@@ -108,5 +108,25 @@ const putUpdate=async (req,res)=>{
     }
 }
 
+const deleteUpdate=async (req,res)=>{
+    const newId=req.params.id;
+    if (!mongoose.Types.ObjectId.isValid(newId)) return res.status(404).json({'message': 'not found'});
+    try{
+        const deletedUpdate=await Update.findByIdAndDelete(newId, { projection: { __v: 0, createdAt: 0, updatedAt: 0 }}).lean();
+        if(!deletedUpdate) return res.status(404).json({'message': 'not found'});
+        try{
+            await redisClient.del('news_cache');
+            await redisClient.del(`new_${newId}`);
+        }
+        catch(redisError){
+            console.warn('Error en Redis:', redisError);
+        }
+        return res.json(deletedUpdate);
+    }
+    catch(error){
+        console.error('Error en deleteUpdate:', error);
+        return res.status(500).json({ error: 'Error al eliminar novedad' });
+    }
+}
 
-export default { getUpdates, getUpdateById, postUpdate, putUpdate}
+export default { getUpdates, getUpdateById, postUpdate, putUpdate, deleteUpdate}

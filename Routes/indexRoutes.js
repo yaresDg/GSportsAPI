@@ -30,6 +30,7 @@ router.get('/novedades', updateController.getUpdates);
 router.get('/novedades/:id', updateController.getUpdateById);
 router.post('/novedades', updateController.postUpdate);
 router.put('/novedades/:id', updateController.putUpdate);
+router.delete('/novedades/:id', updateController.deleteUpdate);
 
 //Para actualizar en el futuro
 router.get('/ligas', indexController.getLigas);
