@@ -5,13 +5,10 @@ import cors from 'cors';
 import compression from 'compression';
 import indexRoutes from './Routes/indexRoutes.js';
 import connectDb from './db/connection.js';
-import dotenv from 'dotenv';
-
-dotenv.config();
-
+import config from './config.js'
 
 const app=express();
-const port=process.env.PORT || 3000;
+const port=config.port;
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
