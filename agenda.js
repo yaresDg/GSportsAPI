@@ -411,8 +411,12 @@ async function fetchAndCacheAgenda() {
     let finalAgenda = [...finalEvents, ...virtualEvents].filter(event => event.station_ids && event.station_ids.length > 0);
     console.log(`Agenda final generada con ${finalAgenda.length} eventos con transmisión confirmada.`);
     try {
-        await agendaEventModel.deleteMany();
+        await agendaEventModel.deleteMany({});
         console.log('Base de datos limpiada.');
+        finalAgenda=finalAgenda.map(ev=>{
+            if(ev._id) delete ev._id;
+            return ev;
+        });
         await agendaEventModel.insertMany(finalAgenda, { ordered: false });
         console.log(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
         try {
