@@ -40,7 +40,6 @@ router.delete('/novedades/:id', verifyToken, updateController.deleteUpdate);
 
 //Para actualizar en el futuro
 router.get('/ligas', indexController.getLigas);
-router.get('/non-spanish-radios', indexController.getRadiosMap);
 router.get('/league-map', indexController.getLeagueMap);
 router.get('/team-map', indexController.getTeamMap);
 
