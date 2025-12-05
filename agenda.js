@@ -284,7 +284,12 @@ async function fetchAndCacheAgenda() {
         rescuedCount++;
     });
     if (rescuedCount > 0) console.log(`Se rescataron ${rescuedCount} eventos válidos (en curso, etc.) de la caché anterior.`);
-    manualEvents.forEach(event => finalEventsMap.set(event.idEvent, event));
+    manualEvents.forEach(event => {
+        if (!finalEventsMap.has(event.idEvent)){
+            finalEventsMap.set(event.idEvent, event);
+            event.manual=true;
+        }
+    });
     let allUniqueEvents = Array.from(finalEventsMap.values());
     console.log(`Total de eventos después de la fusión: ${allUniqueEvents.length}.`);
     console.log("\n--- Fase 3: Enriqueciendo la agenda... ---");
