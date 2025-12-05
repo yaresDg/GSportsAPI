@@ -6,8 +6,8 @@ const ManualEventSchema = new mongoose.Schema({
         required: true
     },
     strEvent: { type: String, required: true },
-    strHomeTeam: { type: String, required: true },
-    strAwayTeam: { type: String, required: true },
+    strHomeTeam: { type: String, required: false },
+    strAwayTeam: { type: String, required: false },
     strLeague: { type: String },
     idLeague: { type: String },
     strTimestamp: { type: Date, required: true },
