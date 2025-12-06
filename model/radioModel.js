@@ -17,6 +17,10 @@ const RadioSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  idioma: {
+    type: String,
+    default: ""
+  },
   id_thesportsdb: {
     type: [String],
     default: []
