@@ -718,17 +718,25 @@ async function fetchAndCacheAgenda() {
             19, 0, 0, 0
         ));
         const vTime = `${todayString}T19:00:00Z`;
-        virtualEvents.push({ 
-            idEvent: `virtual-champions-${todayString}`, 
-            strEvent: "Champions League en español", 
-            strLeague: "Godeano Sports PRESENTA", 
-            strTimestamp: vTime, 
-            station_ids: CHAMPIONS_LEAGUE_STATION_IDS, 
-            idLeague: GODEANO_PRESENTS_ID, 
-            strStatus: "VIRTUAL" 
-        });
-        console.log("Evento virtual de Champions League creado porque hay partidos hoy.");
-    } else {
+        const virtualEventId = `virtual-champions-${todayString}`;
+        const existingChampionsEvent = finalEvents.find(e =>
+          e.idEvent === virtualEventId ||
+          (e.idLeague === GODEANO_PRESENTS_ID && e.strEvent === "Champions League en español")
+        );
+        if(!existingChampionsEvent){
+            virtualEvents.push({ 
+                idEvent: `virtual-champions-${todayString}`, 
+                strEvent: "Champions League en español", 
+                strLeague: "Godeano Sports PRESENTA", 
+                strTimestamp: vTime, 
+                station_ids: CHAMPIONS_LEAGUE_STATION_IDS, 
+                idLeague: GODEANO_PRESENTS_ID, 
+                strStatus: "VIRTUAL" 
+            });
+            console.log("Evento virtual de Champions League creado porque hay partidos hoy.");
+        }
+    }
+    else {
         console.log("No se crea evento virtual de Champions League porque no hay partidos hoy.");
     }
 
@@ -782,16 +790,23 @@ async function fetchAndCacheAgenda() {
         let bestTime = Object.keys(timeCounts).reduce((a, b) => 
             timeCounts[a] > timeCounts[b] ? a : b
         );
-        virtualEvents.push({ 
-            idEvent: `virtual-xered-${todayString}`, 
-            strEvent: "Liga Mexicana del Pacífico", 
-            strLeague: "Godeano Sports PRESENTA", 
-            strTimestamp: bestTime, 
-            station_ids: [XERED_ID], 
-            idLeague: GODEANO_PRESENTS_ID, 
-            strStatus: "VIRTUAL" 
-        });
-        console.log(`Evento virtual 'XERED LMP' creado para ${bestTime}.`);
+        const virtualEventId = `virtual-xered-${todayString}`;
+        const existingXeredEvent = finalEvents.find(e =>
+            e.idEvent === virtualEventId ||
+            (e.idLeague === GODEANO_PRESENTS_ID && e.strEvent === "Liga Mexicana del Pacífico")
+        );
+        if(!existingXeredEvent){
+            virtualEvents.push({ 
+                idEvent: `virtual-xered-${todayString}`, 
+                strEvent: "Liga Mexicana del Pacífico", 
+                strLeague: "Godeano Sports PRESENTA", 
+                strTimestamp: bestTime, 
+                station_ids: [XERED_ID], 
+                idLeague: GODEANO_PRESENTS_ID, 
+                strStatus: "VIRTUAL" 
+            });
+            console.log(`Evento virtual 'XERED LMP' creado para ${bestTime}.`);
+        }
     }
     let finalAgenda = [...finalEvents, ...virtualEvents].filter(event => event.station_ids && event.station_ids.length > 0);
     console.log(`Agenda final generada con ${finalAgenda.length} eventos con transmisión confirmada.`);
