@@ -548,7 +548,7 @@ async function fetchAndCacheAgenda() {
     const teamsArray = Array.from(teamsToFetch).map(id => ({ id }));
     console.log(`Se buscarán los partidos de ${teamsArray.length} equipos (no MLB, no F1) en TheSportsDB.`);
     for (const [index, team] of teamsArray.entries()) {
-        console.log(`(${index + 1}/${teamsArray.length}) Buscando para el equipo ID: ${team.id}`);
+        //console.log(`(${index + 1}/${teamsArray.length}) Buscando para el equipo ID: ${team.id}`);
         const url = `https://www.thesportsdb.com/api/v1/json/${THESPORTSDB_API_KEY}/eventsnext.php?id=${team.id}`;
         try {
             const response = await fetch(url);
