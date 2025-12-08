@@ -40,15 +40,25 @@ const MLB_ID_TO_THESPORTSDB_ID_MAP = { 139: '135263', 112: '135269', 110: '13525
 //nuevasIDS
 const UNION_RADIO_ID = 'union_radio_ve';
 const XERED_ID = 'xered_radio_red_texans';
+const WRTO_ID = 'wrto_chicago';
 const LMP_LEAGUE_ID = '132';
 const LVBP_LEAGUE_ID = '135';
 const GODEANO_PRESENTS_ID = 'godeano_presents';
+
+const STATION_RESTRICTIONS = {
+    'wrto_chicago': { type: 'HOME_ONLY', teams: ['134870', '112'] }, // Bulls, Cubs
+    'kwkw_tu_liga_radio': { type: 'HOME_ONLY', teams: ['134866'] }, // Clippers
+    'mas_latino_ne': { type: 'HOME_ONLY', teams: ['134159'] }, // NE Revolution
+    'radio_tiempo_caguas': { type: 'HOME_ONLY', teams: ['686'] }, // Criollos de Caguas
+    'wpra': { type: 'AWAY_ONLY', teams: ['688'] } // Indios de Mayag�ez
+};
+
 // Ligas para MLB Stats API
 const LEAGUES_TO_FETCH = [
     { id: '132', name: 'Liga Mexicana del Pacífico' },
     { id: '131', name: 'LIDOM' },
     { id: '135', name: 'LVBP' },
-    { id: '133', name: 'Liga de Béisbol de Puerto Rico' },
+    { id: '133', name: 'LBPRC' },
     { id: '1', name: 'MLB' }
 ];
 // TV Sources
@@ -636,9 +646,24 @@ async function fetchAndCacheAgenda() {
         const leagueId = String(event.idLeague);
         radiosData.forEach(station => {
             const stationIds = (Array.isArray(station.id_thesportsdb) ? station.id_thesportsdb : [station.id_thesportsdb]).map(String);
-            if (stationIds.includes(homeId) || stationIds.includes(awayId) || stationIds.includes(leagueId)) {
+            // Lógica corregida: Eliminada asignación por leagueId para evitar conflictos (LVBP/Padres, etc.)
+            const matchHome = stationIds.includes(homeId);
+            const matchAway = stationIds.includes(awayId);
+
+            if (matchHome || matchAway) {
                 const isLidom = (leagueId === '131');
                 if (isLidom && stationIds.includes(awayId) && !stationIds.includes(homeId)) return;
+
+                // Aplicación de Restricciones (Local/Visita)
+                const restriction = STATION_RESTRICTIONS[station.id];
+                if (restriction) {
+                    if (restriction.teams.includes(homeId) && matchHome && restriction.type === 'AWAY_ONLY') return;
+                    if (restriction.teams.includes(awayId) && matchAway && restriction.type === 'HOME_ONLY') return;
+                    // También cubrir caso donde el ID coincide pero es el equipo "restringido" jugando en la condición prohibida
+                    if (matchHome && restriction.type === 'AWAY_ONLY') return; // Si matchea local pero la radio es SOLO VISITA
+                    if (matchAway && restriction.type === 'HOME_ONLY') return; // Si matchea visita pero la radio es SOLO LOCAL
+                }
+
                 if (!existingStations.has(station.id)) {
                     if (!Array.isArray(event.station_ids)) event.station_ids = [];
                     event.station_ids.push(station.id);
@@ -686,6 +711,7 @@ async function fetchAndCacheAgenda() {
                 }
                 let isBusy = false;
                 for (const otherEvent of finalEvents) {
+                    if (!otherEvent.station_ids) continue
                     const otherStationIds = otherEvent.station_ids.map(s => typeof s === 'object' ? s.id : s);
                     if (otherEvent.idEvent !== event.idEvent &&
                         otherStationIds.includes(tudnStationId) &&
@@ -702,6 +728,45 @@ async function fetchAndCacheAgenda() {
             }
         }
     });
+
+    // --- Fase 5.5: Lógica NFL (WRTO SNF/MNF) ---
+    try {
+        const nflGames = finalEvents.filter(e => e.strLeague && e.strLeague.includes('NFL'));
+        if (nflGames.length > 0) {
+            // Chicago Timezone Offset (aprox, para separar días correctamente)
+            const chicagoOffset = -6 * 60 * 60 * 1000;
+
+            // Monday Night Football
+            const mondayGames = nflGames.filter(e => {
+                const date = new Date(new Date(e.strTimestamp).getTime() + chicagoOffset);
+                return date.getDay() === 1; // 1 = Lunes
+            });
+            mondayGames.forEach(game => {
+                 if (!game.station_ids.includes(WRTO_ID)) {
+                     game.station_ids.push(WRTO_ID);
+                     console.log(`-> Asignado WRTO (MNF) a: ${game.strEvent}`);
+                 }
+            });
+
+            // Sunday Night Football (El último juego del domingo)
+            const sundayGames = nflGames.filter(e => {
+                const date = new Date(new Date(e.strTimestamp).getTime() + chicagoOffset);
+                return date.getDay() === 0; // 0 = Domingo
+            });
+            if (sundayGames.length > 0) {
+                // Ordenar por hora descendente (el último primero)
+                sundayGames.sort((a, b) => new Date(b.strTimestamp) - new Date(a.strTimestamp));
+                const snfGame = sundayGames[0]; // Tomar el último
+                if (!snfGame.station_ids.includes(WRTO_ID)) {
+                    snfGame.station_ids.push(WRTO_ID);
+                    console.log(`-> Asignado WRTO (SNF) a: ${snfGame.strEvent}`);
+                }
+            }
+        }
+    } catch (err) {
+        console.log(`Error asignando NFL/WRTO: ${err.message}`);
+    }
+
     //finalEvents = await fetchAndAssignYoutubeStreams(finalEvents);
     const virtualEvents = [];
     const todayString = now.toISOString().split('T')[0];
