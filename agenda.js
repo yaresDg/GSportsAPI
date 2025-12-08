@@ -121,18 +121,21 @@ async function fetchWinterLeaguesAndMlb() {
                         const homeId = String(game.teams.home.team.id);
                         const awayId = String(game.teams.away.team.id);
                         const leagueId = String(league.id);
-
+                        let status = game.status.abstractGameState;
+                        if (status === 'Preview' || status === 'Scheduled' || status === 'Pre-Game') {
+                            status = 'Not Started';
+                        }
                         events.push({
                             idEvent: String(game.gamePk),
                             strEvent: `${game.teams.home.team.name} vs ${game.teams.away.team.name}`,
+                            strSport: 'Baseball',
+                            strThumb: 'https://www.thesportsdb.com/images/media/sport/thumb/baseball.jpg',
                             idLeague: leagueId,
                             strLeague: league.name,
                             strHomeTeam: game.teams.home.team.name,
                             strAwayTeam: game.teams.away.team.name,
-                            idHomeTeam: homeId,
-                            idAwayTeam: awayId,
-                            idHomeTeamTSDB: MLB_ID_TO_THESPORTSDB_ID_MAP[homeId] || null,
-                            idAwayTeamTSDB: MLB_ID_TO_THESPORTSDB_ID_MAP[awayId] || null,
+                            idHomeTeam:  MLB_ID_TO_THESPORTSDB_ID_MAP[homeId] || homeId,
+                            idAwayTeam: MLB_ID_TO_THESPORTSDB_ID_MAP[awayId] || awayId,
                             strTimestamp: new Date(game.gameDate).toISOString(),
                             dateEvent: game.officialDate,
                             strStatus: game.status.abstractGameState,
@@ -362,6 +365,7 @@ async function fetchTvPassportData() {
                 } else {
                     stationEventsMap.set(eventKey, newEv);
                 }
+                if (!newEv._isLive) return;                                                                                           
             });
 
             for (const ev of stationEventsMap.values()) {
@@ -384,13 +388,11 @@ function mergeTvEvents(apiEvents, tvEvents) {
     tvEvents.forEach(tvEv => {
         const match = merged.find(apiEv => {
             const timeDiff = Math.abs(new Date(apiEv.strTimestamp) - new Date(tvEv.strTimestamp));
-            if (timeDiff > (4 * 3600 * 1000)) return false;
-
+            if (timeDiff > (6 * 3600 * 1000)) return false;
             const normTv = normalizeText(tvEv.strEvent);
             const normApi = normalizeText(apiEv.strEvent);
             const home = normalizeText(apiEv.strHomeTeam);
             const away = normalizeText(apiEv.strAwayTeam);
-
             return (normTv.includes(home) || home.includes(normTv)) && 
                    (normTv.includes(away) || away.includes(normTv));
         });
@@ -632,11 +634,9 @@ async function fetchAndCacheAgenda() {
         const homeId = String(event.idHomeTeam);
         const awayId = String(event.idAwayTeam);
         const leagueId = String(event.idLeague);
-        const homeIdTSDB = event.idHomeTeamTSDB; 
-        const awayIdTSDB = event.idAwayTeamTSDB;
         radiosData.forEach(station => {
             const stationIds = (Array.isArray(station.id_thesportsdb) ? station.id_thesportsdb : [station.id_thesportsdb]).map(String);
-            if (stationIds.includes(homeId) || stationIds.includes(awayId) || stationIds.includes(leagueId) ||     (homeIdTSDB && stationIds.includes(homeIdTSDB)) || (awayIdTSDB && stationIds.includes(awayIdTSDB))) {
+            if (stationIds.includes(homeId) || stationIds.includes(awayId) || stationIds.includes(leagueId)) {
                 const isLidom = (leagueId === '131');
                 if (isLidom && stationIds.includes(awayId) && !stationIds.includes(homeId)) return;
                 if (!existingStations.has(station.id)) {
