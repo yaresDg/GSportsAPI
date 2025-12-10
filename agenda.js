@@ -875,15 +875,22 @@ async function fetchAndCacheAgenda() {
     }
     let finalAgenda = [...finalEvents, ...virtualEvents].filter(event => event.station_ids && event.station_ids.length > 0);
     console.log(`Agenda final generada con ${finalAgenda.length} eventos con transmisión confirmada.`);
+    let session=null;
     try {
-        await agendaEventModel.deleteMany({});
+        session=await mongoose.startSession();
+        session.startTransaction();
+        console.log('Inicio de la transacción...');
+        await agendaEventModel.deleteMany({},{session});
         console.log('Base de datos limpiada.');
         finalAgenda=finalAgenda.map(ev=>{
             if(ev._id) delete ev._id;
             return ev;
         });
-        await agendaEventModel.insertMany(finalAgenda, { ordered: false });
+        await agendaEventModel.insertMany(finalAgenda, { session, ordered: false });
         console.log(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
+        await session.commitTransaction();
+        console.log('Fin de la transacción');
+        session.endSession();
         try {
             await redisClient.del('agenda_cache');
             console.log('Caché de Redis ("agenda_cache") vaciada exitosamente.');
@@ -894,7 +901,20 @@ async function fetchAndCacheAgenda() {
         }
     }
     catch (error) {
+        if(session){
+            try {
+                await session.abortTransaction();
+                console.log("Transacción abortada correctamente.");
+            }
+            catch (abortErr) {
+                console.log(`⚠️ Error abortando transacción: ${abortErr.message}`);
+            }
+            finally {
+                session.endSession();
+            }
+        }
         console.log(`Error al guardar la agenda en MongoDB: ${error.message}`);
+        console.log('los cambios fueron revertidos');
     }
     finally{
         try {
