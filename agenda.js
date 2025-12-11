@@ -507,7 +507,7 @@ async function fetchAndCacheAgenda() {
     const startTimeOperation=Date.now();
     console.log("Iniciando la obtención de la agenda completa...");
     //FASE 1: OBTENER TODOS LOS EVENTOS (API Y MANUALES)
-    console.log("\n--- Fase 1: Recopilando todos los eventos nuevos de las APIs y archivos locales ---");
+    console.log("\n--- Fase 1: Recopilando todos los eventos nuevos de las APIs y base de datos  local ---");
     let radiosData;
     try {
         radiosData = await Radio.find({}).lean();
@@ -556,7 +556,7 @@ async function fetchAndCacheAgenda() {
         });
     });
     const teamsArray = Array.from(teamsToFetch).map(id => ({ id }));
-    console.log(`Se buscarán los partidos de ${teamsArray.length} equipos (no MLB, no F1) en TheSportsDB.`);
+    console.log(`Buscando los partidos de ${teamsArray.length} equipos (no MLB, no F1) en TheSportsDB.`);
     for (const [index, team] of teamsArray.entries()) {
         //console.log(`(${index + 1}/${teamsArray.length}) Buscando para el equipo ID: ${team.id}`);
         const url = `https://www.thesportsdb.com/api/v1/json/${THESPORTSDB_API_KEY}/eventsnext.php?id=${team.id}`;
@@ -880,14 +880,29 @@ async function fetchAndCacheAgenda() {
         session=await mongoose.startSession();
         session.startTransaction();
         console.log('Inicio de la transacción...');
-        await agendaEventModel.deleteMany({},{session});
+        /*await agendaEventModel.deleteMany({},{session});
         console.log('Base de datos limpiada.');
         finalAgenda=finalAgenda.map(ev=>{
             if(ev._id) delete ev._id;
             return ev;
         });
-        await agendaEventModel.insertMany(finalAgenda, { session, ordered: false });
-        console.log(`Se guardaron ${finalAgenda.length} eventos en MongoDB.`);
+        await agendaEventModel.insertMany(finalAgenda, { session, ordered: false });*/
+        //Actualizar lo necesario en lugar de borrar toda la colección
+        for(const event of finalAgenda){
+            let filtro;
+            if(event._id){
+                filtro={ _id: event._id };
+            }
+            else{
+                filtro={ idEvent: event.idEvent };
+            }
+            await agendaEventModel.updateOne(
+                filtro,
+                { $set: event },
+                { upsert: true, session }
+            );
+        }
+        console.log(`Se actualizaron ${finalAgenda.length} eventos en MongoDB.`);
         await session.commitTransaction();
         console.log('Fin de la transacción');
         session.endSession();
