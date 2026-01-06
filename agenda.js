@@ -604,7 +604,7 @@ async function fetchAndCacheAgenda() {
         console.log(`Se cargaron ${oldEventsCache.length} eventos antiguos desde MongoDB.`);
     }
     catch (err) {
-        console.log(`⚠️ No se pudieron cargar eventos previos desde MongoDB: ${err.message}`);
+        console.log(`⚠�  No se pudieron cargar eventos previos desde MongoDB: ${err.message}`);
     }
     const updatedTeamIds = new Set();
     const BASEBALL_LEAGUE_IDS = new Set(['4424', '1', '131', '132', '133', '135']); // TSDB MLB + StatsAPI + Invierno
@@ -616,12 +616,41 @@ async function fetchAndCacheAgenda() {
     });
     console.log(`Se ha obtenido información fresca para ${updatedTeamIds.size} equipos de TheSportsDB.`);
     const finalEventsMap = new Map();
-    newUniqueEvents.forEach(event => finalEventsMap.set(event.idEvent, event));
+
+    // MODIFICACIÓN: Crear un mapa de eventos viejos para facilitar la búsqueda
+    const oldEventsMap = new Map(oldEventsCache.map(e => [e.idEvent, e]));
+
+    // MODIFICACIÓN: Procesar nuevos eventos e intentar fusionar radios acumuladas ("Persistencia")
+    newUniqueEvents.forEach(event => {
+        const oldEvent = oldEventsMap.get(event.idEvent);
+        if (oldEvent && Array.isArray(oldEvent.station_ids) && oldEvent.station_ids.length > 0) {
+            // Inicializar si no existe
+            if (!event.station_ids) event.station_ids = [];
+            
+            // Crear un Set con los IDs actuales para evitar duplicados rápidos
+            const currentIds = new Set(event.station_ids.map(s => typeof s === 'object' ? s.id : s));
+            
+            // Agregar las radios viejas que no estén en la nueva lista
+            oldEvent.station_ids.forEach(oldStation => {
+                const oldStationId = typeof oldStation === 'object' ? oldStation.id : oldStation;
+                if (!currentIds.has(oldStationId)) {
+                    event.station_ids.push(oldStation);
+                    currentIds.add(oldStationId);
+                }
+            });
+            // console.log(`   -> Radios fusionadas para: ${event.strEvent}`); // Opcional para debug
+        }
+        finalEventsMap.set(event.idEvent, event);
+    });
+
     let rescuedCount = 0;
     oldEventsCache.forEach(oldEvent => {
         if (finalEventsMap.has(oldEvent.idEvent)) return;
         if (String(oldEvent.idLeague) === FORMULA1_LEAGUE_ID) return;
-        if (updatedTeamIds.has(String(oldEvent.idHomeTeam)) || updatedTeamIds.has(String(oldEvent.idAwayTeam))) return;
+        
+        // MODIFICACIÓN: Comentamos esta línea para evitar borrar partidos si la API falla momentáneamente
+        // if (updatedTeamIds.has(String(oldEvent.idHomeTeam)) || updatedTeamIds.has(String(oldEvent.idAwayTeam))) return;
+        
         if (oldEvent.manual) return;
         finalEventsMap.set(oldEvent.idEvent, oldEvent);
         rescuedCount++;
@@ -903,6 +932,14 @@ async function fetchAndCacheAgenda() {
             );
         }
         console.log(`Se actualizaron ${finalAgenda.length} eventos en MongoDB.`);
+        
+        // MODIFICACIÓN: Garbage Collector (Limpieza segura de eventos muy viejos)
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        await agendaEventModel.deleteMany({
+            strTimestamp: { $lt: twentyFourHoursAgo.toISOString() }
+        }, { session });
+        console.log("Limpieza completada: Partidos de hace más de 24hs eliminados.");
+
         await session.commitTransaction();
         console.log('Fin de la transacción');
         session.endSession();
@@ -912,7 +949,7 @@ async function fetchAndCacheAgenda() {
             await deleteKeysByPattern('agenda_event_*');
         }
         catch (err) {
-            console.log(`⚠️ No se pudo limpiar la caché de Redis: ${err.message}`);
+            console.log(`⚠�  No se pudo limpiar la caché de Redis: ${err.message}`);
         }
     }
     catch (error) {
@@ -922,7 +959,7 @@ async function fetchAndCacheAgenda() {
                 console.log("Transacción abortada correctamente.");
             }
             catch (abortErr) {
-                console.log(`⚠️ Error abortando transacción: ${abortErr.message}`);
+                console.log(`⚠�  Error abortando transacción: ${abortErr.message}`);
             }
             finally {
                 session.endSession();
@@ -938,13 +975,13 @@ async function fetchAndCacheAgenda() {
                 console.log('Conexión Redis cerrada correctamente.');
             }
         } catch (err) {
-            console.log(`⚠️ Error al cerrar Redis: ${err.message}`);
+            console.log(`⚠�  Error al cerrar Redis: ${err.message}`);
         }
         try {
             await mongoose.connection.close();
             console.log('Conexión a MongoDB cerrada correctamente.');
         } catch (err) {
-            console.log(`⚠️ Error al cerrar MongoDB: ${err.message}`);
+            console.log(`⚠�  Error al cerrar MongoDB: ${err.message}`);
         }
         const endTimeOperation=Date.now();
         const totalMs= endTimeOperation - startTimeOperation;

@@ -62,7 +62,7 @@ const AgendaEventSchema = new mongoose.Schema({
     default: null
   },
   strTimestamp: {
-    type: String
+    type: Date
   },
   dateEvent: {
     type: String

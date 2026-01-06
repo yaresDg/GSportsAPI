@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import ManualEvent from '../model/manualEventModel.js';
+import AgendaEvent from '../model/agendaEventModel.js';
 import redisClient from '../redisClient.js';
 
 const getManualEvents=async (req,res)=>{
@@ -70,8 +71,21 @@ const postManualEvent=async (req,res)=>{
         const newManualEvent= new ManualEvent(data);
         await newManualEvent.validate();
         const savedEvent= await newManualEvent.save();
+        const agendaData = {
+            idEvent: savedEvent.idEvent,
+            strEvent: savedEvent.strEvent,
+            strHomeTeam: savedEvent.strHomeTeam,
+            strAwayTeam: savedEvent.strAwayTeam,
+            strLeague: savedEvent.strLeague,
+            idLeague: savedEvent.idLeague,
+            strTimestamp: new Date(savedEvent.strTimestamp),
+            station_ids: savedEvent.station_ids,
+        };
+        const newAgendaEvent= new AgendaEvent(agendaData);
+        await newAgendaEvent.save();
         try{
             await redisClient.del('manualEvents_cache');
+            await redisClient.del('agenda_cache');
         }
         catch(redisError){
             console.warn('Error en Redis:', redisError);
@@ -94,9 +108,23 @@ const putManualEvent=async (req,res)=>{
             data,
         { new: true, runValidators: true, projection: { __v: 0 } }).lean();
         if(!updatedEvent) return res.status(404).json({'message': 'not found'});
+        await AgendaEvent.findOneAndUpdate(
+            { idEvent: updatedEvent.idEvent },
+            {
+                strEvent: updatedEvent.strEvent,
+                strHomeTeam: updatedEvent.strHomeTeam,
+                strAwayTeam: updatedEvent.strAwayTeam,
+                strLeague: updatedEvent.strLeague,
+                idLeague: updatedEvent.idLeague,
+                strTimestamp: new Date(updatedEvent.strTimestamp),
+                station_ids: updatedEvent.station_ids,
+            },
+            { new: true }
+        );
         try{
             await redisClient.del('manualEvents_cache');
             await redisClient.del(`manualEvent_${eventId}`);
+            await redisClient.del('agenda_cache');
             await redisClient.set(`manualEvent_${eventId}`, JSON.stringify(updatedEvent), { EX: 3600 });
         }
         catch(redisError){
@@ -116,9 +144,11 @@ const deleteManualEvent=async (req,res)=>{
     try{
         const deletedEvent=await ManualEvent.findByIdAndDelete(eventId, { projection: { __v: 0, createdAt: 0, updatedAt: 0 }}).lean();
         if(!deletedEvent) return res.status(404).json({'message': 'not found'});
+        await AgendaEvent.findOneAndDelete({ idEvent: deletedEvent.idEvent });
         try{
             await redisClient.del('manualEvents_cache');
             await redisClient.del(`manualEvent_${eventId}`);
+            await redisClient.del('agenda_cache');
         }
         catch(redisError){
             console.warn('Error en Redis:', redisError);

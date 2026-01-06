@@ -1,9 +1,11 @@
 import mongoose from "mongoose";
+import crypto from "crypto";
 
 const ManualEventSchema = new mongoose.Schema({
     idEvent:{
         type: String,
-        required: true
+        required: true,
+        default: () => `manual-${crypto.randomUUID()}`
     },
     strEvent: { type: String, required: true },
     strHomeTeam: { type: String, required: false },
