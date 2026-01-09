@@ -6,12 +6,18 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
     unique: true,
-    trim: true
+    trim: true,
+    lowercase: true
   },
   password: {
     type: String,
     required: true
   },
+  isAdmin:{
+    type: Boolean,
+    default: false,
+    required: true
+  }
 });
 
 // Encriptamos la contraseña antes de guardar el usuario

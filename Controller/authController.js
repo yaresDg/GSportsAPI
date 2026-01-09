@@ -6,6 +6,9 @@ import config from "../config.js";
 
 const postUser = async (req, res) => {
   const { username, password } = req.body;
+  if(!username || !password){
+      return res.status(400).json({ message: 'Username y password son requeridos' });
+  }
   try {
     const usuarioExistente = await User.findOne({ username });
     if (usuarioExistente) return res.status(400).json({ message: 'El nombre de usuario ya existe' });
@@ -24,6 +27,9 @@ const postUser = async (req, res) => {
 
 const postLogin=async(req,res)=>{
     const {username,password}=req.body;
+    if(!username || !password){
+      return res.status(400).json({ message: 'Username y password son requeridos' });
+    }
     try{
         const usuario=await User.findOne({username});
         if(!usuario) return res.status(400).json({message:'username o password incorrectos'});
