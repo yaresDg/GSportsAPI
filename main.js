@@ -3,6 +3,7 @@ import morgan from 'morgan';
 import helmet from 'helmet';
 import cors from 'cors';
 import compression from 'compression';
+import requestIp from 'request-ip';
 import indexRoutes from './Routes/indexRoutes.js';
 import connectDb from './db/connection.js';
 import config from './config.js'
@@ -16,6 +17,7 @@ app.use(express.json());
 app.use(morgan('dev'));
 app.use(compression());
 app.use(passport.initialize());
+app.use(requestIp.mw());
 app.use('/',indexRoutes);
 
 connectDb().then(()=>{

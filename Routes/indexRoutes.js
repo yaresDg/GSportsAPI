@@ -5,6 +5,7 @@ import agendaController from "../Controller/agendaController.js";
 import radioController from "../Controller/radioController.js";
 import eventController from "../Controller/eventController.js";
 import updateController from "../Controller/updateController.js";
+import visitController from "../Controller/visitController.js";
 import passport from "passport";
 import { loginLimiter, registerLimiter } from "../middlewareRateLimit.js";
 import { requireAdmin } from "../middlewareAdminAuth.js";
@@ -39,6 +40,10 @@ router.get('/novedades/:id', updateController.getUpdateById);
 router.post('/novedades', passport.authenticate("jwt", { session: false }), requireAdmin, updateController.postUpdate);
 router.put('/novedades/:id', passport.authenticate("jwt", { session: false }), requireAdmin, updateController.putUpdate);
 router.delete('/novedades/:id', passport.authenticate("jwt", { session: false }), requireAdmin, updateController.deleteUpdate);
+
+//stats de visitas
+router.get('/stats/visits', visitController.getVisits);
+router.post('/stats/visits', visitController.postVisit);
 
 //Para actualizar en el futuro
 router.get('/ligas', indexController.getLigas);
