@@ -874,7 +874,7 @@ async function fetchAndCacheAgenda() {
     // XERED LMP (Virtual basado en moda horaria)
     const lmpGames = finalEvents.filter(e => 
         String(e.idLeague) === LMP_LEAGUE_ID && 
-        e.strTimestamp.startsWith(todayString)
+        String(e.strTimestamp).startsWith(todayString)
     );
     if (lmpGames.length > 0) {
         const timeCounts = {};

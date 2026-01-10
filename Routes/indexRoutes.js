@@ -42,8 +42,8 @@ router.put('/novedades/:id', passport.authenticate("jwt", { session: false }), r
 router.delete('/novedades/:id', passport.authenticate("jwt", { session: false }), requireAdmin, updateController.deleteUpdate);
 
 //stats de visitas
-router.get('/stats/visits', visitController.getVisits);
-router.post('/stats/visits', visitController.postVisit);
+router.get('/stats/visits', passport.authenticate("jwt", { session: false }), requireAdmin, visitController.getVisits);
+router.post('/stats/visits', passport.authenticate("jwt", { session: false }), requireAdmin, visitController.postVisit);
 
 //Para actualizar en el futuro
 router.get('/ligas', indexController.getLigas);
