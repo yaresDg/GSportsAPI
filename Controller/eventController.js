@@ -67,6 +67,10 @@ const getManualEventById=async(req,res)=>{
 
 const postManualEvent=async (req,res)=>{
     const data= req.body;
+    // Eliminar idEvent si viene vacío para que Mongoose use el default
+    if (!data.idEvent || data.idEvent.trim() === '') {
+        delete data.idEvent;
+    }
     try{
         const newManualEvent= new ManualEvent(data);
         await newManualEvent.validate();
@@ -103,6 +107,10 @@ const putManualEvent=async (req,res)=>{
     const data=req.body;
     if (!mongoose.Types.ObjectId.isValid(eventId)) return res.status(404).json({'message': 'not found'});
     try{
+        // El idEvent NO debe cambiar una vez creado el evento
+        if (data.idEvent !== undefined) {
+        delete data.idEvent;
+        }
         const updatedEvent = await ManualEvent.findByIdAndUpdate(
             eventId,
             data,
