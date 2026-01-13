@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import AgendaEvent from '../model/agendaEventModel.js';
 import redisClient from '../redisClient.js';
-import { getEventDuration, parseEventDate, orderByRelevantEvents } from '../filters.js';
+import { orderByRelevantEvents } from '../filters.js';
 
 const getAgenda=async (req,res)=>{
     try{
@@ -22,7 +22,7 @@ const getAgenda=async (req,res)=>{
             console.warn('Error en Redis:', redisError);
         }
         console.log('Caché vacío. Leyendo la base de datos');
-        let allEvents=await AgendaEvent.find({},{__v: 0}).lean();
+        let allEvents=await AgendaEvent.find({},{__v: 0}).sort({strTimestamp: 1}).lean();
         try{
             await redisClient.set(cacheKey, JSON.stringify(allEvents), { EX: 3600 });
         }

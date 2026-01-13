@@ -67,10 +67,7 @@ const getManualEventById=async(req,res)=>{
 
 const postManualEvent=async (req,res)=>{
     const data= req.body;
-    // Eliminar idEvent si viene vacío para que Mongoose use el default
-    if (!data.idEvent || data.idEvent.trim() === '') {
-        delete data.idEvent;
-    }
+    delete data.idEvent;
     try{
         const newManualEvent= new ManualEvent(data);
         await newManualEvent.validate();

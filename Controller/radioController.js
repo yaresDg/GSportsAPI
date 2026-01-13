@@ -66,6 +66,8 @@ const getRadioById=async(req,res)=>{
 
 const postRadio=async (req,res)=>{
     const data= req.body;
+    if(data.pais) data.pais = data.pais.charAt(0).toUpperCase() + data.pais.slice(1);
+    if(data.idioma) data.idioma = data.idioma.charAt(0).toUpperCase() + data.idioma.slice(1);
     try{
         const newRadio= new Radio(data);
         await newRadio.validate();
@@ -87,6 +89,8 @@ const postRadio=async (req,res)=>{
 const putRadio=async (req,res)=>{
     const radioId=req.params.id;
     const data=req.body;
+    if(data.pais) data.pais = data.pais.charAt(0).toUpperCase() + data.pais.slice(1);
+    if(data.idioma) data.idioma = data.idioma.charAt(0).toUpperCase() + data.idioma.slice(1);
     if (!mongoose.Types.ObjectId.isValid(radioId)) return res.status(404).json({'message': 'not found'});
     try{
         const updatedRadio = await Radio.findByIdAndUpdate(

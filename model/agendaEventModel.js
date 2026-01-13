@@ -65,16 +65,18 @@ const AgendaEventSchema = new mongoose.Schema({
     type: Date
   },
   dateEvent: {
-    type: String
+    type: Date
   },
   dateEventLocal: {
-    type: String
+    type: Date
   },
   strTime: {
-    type: String
+    type: String,
+    default: null
   },
   strTimeLocal: {
-    type: String
+    type: String,
+    default: null
   },
   strGroup: {
     type: String

@@ -1,4 +1,5 @@
 import fetch from 'node-fetch';
+import { getEventDuration } from './filters.js';
 import { google } from 'googleapis';
 import redisClient from './redisClient.js';
 import mongoose from 'mongoose';
@@ -79,13 +80,7 @@ const TV_FORCE_TIMEZONE_ID = 'America/New_York';
 //DICCIONARIOS Y AYUDANTES
 const F1_GRAND_PRIX_MAP = { "Bahrain Grand Prix": "Gran Premio de Baréin", "Saudi Arabian Grand Prix": "Gran Premio de Arabia Saudita", "Australian Grand Prix": "Gran Premio de Australia", "Japanese Grand Prix": "Gran Premio de Japón", "Chinese Grand Prix": "Gran Premio de China", "Miami Grand Prix": "Gran Premio de Miami", "Emilia Romagna Grand Prix": "Gran Premio de Emilia-Romaña", "Monaco Grand Prix": "Gran Premio de Mónaco", "Canadian Grand Prix": "Gran Premio de Canadá", "Spanish Grand Prix": "Gran Premio de España", "Austrian Grand Prix": "Gran Premio de Austria", "British Grand Prix": "Gran Premio de Gran Bretaña", "Hungarian Grand Prix": "Gran Premio de Hungría", "Belgian Grand Prix": "Gran Premio de Bélgica", "Dutch Grand Prix": "Gran Premio de los Países Bajos", "Italian Grand Prix": "Gran Premio de Italia", "Azerbaijan Grand Prix": "Gran Premio de Azerbaiyán", "Singapore Grand Prix": "Gran Premio de Singapur", "United States Grand Prix": "Gran Premio de los Estados Unidos", "Mexico City Grand Prix": "Gran Premio de la Ciudad de México", "Sao Paulo Grand Prix": "Gran Premio de São Paulo", "Las Vegas Grand Prix": "Gran Premio de Las Vegas", "Qatar Grand Prix": "Gran Premio de Qatar", "Abu Dhabi Grand Prix": "Gran Premio de Abu Dabi" };
 
-function getEventDuration(sport){
-    const sportType = sport || "";
-    if (sportType.includes('Soccer') || sportType.includes('Champions')) return 2.5 * 60 * 60 * 1000;
-    if (sportType.includes('Basketball')) return 3 * 60 * 60 * 1000;
-    if (sportType.includes('Baseball') || sportType.includes('MLB') || sportType.includes('Pacífico') || sportType.includes('Venezolana') || sportType.includes('LIDOM')) return 3.5 * 60 * 60 * 1000;
-    return 4 * 60 * 60 * 1000;
-}
+
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 function normalizeText(text){
     if (!text) return '';
@@ -146,7 +141,7 @@ async function fetchWinterLeaguesAndMlb() {
                             strAwayTeam: game.teams.away.team.name,
                             idHomeTeam:  MLB_ID_TO_THESPORTSDB_ID_MAP[homeId] || homeId,
                             idAwayTeam: MLB_ID_TO_THESPORTSDB_ID_MAP[awayId] || awayId,
-                            strTimestamp: new Date(game.gameDate).toISOString(),
+                            strTimestamp: new Date(game.gameDate),
                             dateEvent: game.officialDate,
                             strStatus: game.status.abstractGameState,
                             station_ids: []
@@ -360,7 +355,7 @@ async function fetchTvPassportData() {
                     idLeague: "TV_DATA",
                     strHomeTeam: homeTeam || strEvent,
                     strAwayTeam: awayTeam,
-                    strTimestamp: eventDate.toUTC().toISO(),
+                    strTimestamp: eventDate.toUTC().toJSDate(),
                     station_ids: [station.id],
                     strStatus: "TV",
                     _isLive: isLive,
@@ -604,7 +599,7 @@ async function fetchAndCacheAgenda() {
         console.log(`Se cargaron ${oldEventsCache.length} eventos antiguos desde MongoDB.`);
     }
     catch (err) {
-        console.log(`⚠�  No se pudieron cargar eventos previos desde MongoDB: ${err.message}`);
+        console.log(`⚠�  No se pudieron cargar eventos previos desde MongoDB: ${err.message}`);
     }
     const updatedTeamIds = new Set();
     const BASEBALL_LEAGUE_IDS = new Set(['4424', '1', '131', '132', '133', '135']); // TSDB MLB + StatsAPI + Invierno
@@ -811,7 +806,7 @@ async function fetchAndCacheAgenda() {
             now.getUTCDate(),
             19, 0, 0, 0
         ));
-        const vTime = `${todayString}T19:00:00Z`;
+        const vTime = new Date(`${todayString}T19:00:00Z`);
         const virtualEventId = `virtual-champions-${todayString}`;
         const existingChampionsEvent = finalEvents.find(e =>
           e.idEvent === virtualEventId ||
@@ -840,22 +835,23 @@ async function fetchAndCacheAgenda() {
             const gameTimes = {};
             cubanGamesToday.forEach(game => {
                 if(game.strTimestamp) {
-                    const time = game.strTimestamp;
-                    gameTimes[time] = (gameTimes[time] || 0) + 1;
+                    // Usar getTime() para evitar conversión a string del Date
+                    const timeKey = game.strTimestamp.getTime();
+                    gameTimes[timeKey] = (gameTimes[timeKey] || 0) + 1;
                 }
             });
             let broadcastTime = null;
-            const sortedTimes = Object.keys(gameTimes).sort();
+            const sortedTimes = Object.keys(gameTimes).map(Number).sort();
             for (const time of sortedTimes) {
                 if (gameTimes[time] >= 3) {
-                    broadcastTime = time;
+                    broadcastTime = new Date(time);
                     break;
                 }
             }
             if (broadcastTime) {
                 virtualEvents.push({
                     idEvent: "virtual-3", strEvent: "Béisbol Rebelde", strLeague: "Serie Nacional Cubana",
-                    strHomeTeam: "Béisbol Rebelde", strAwayTeam: "", strTimestamp: new Date(broadcastTime).toISOString(),
+                    strHomeTeam: "Béisbol Rebelde", strAwayTeam: "", strTimestamp: new Date(broadcastTime),
                     station_ids: [RADIO_REBELDE_STATION_ID],
                     idLeague: CUBAN_LEAGUE_ID,
                     strStatus: "VIRTUAL"
@@ -872,16 +868,20 @@ async function fetchAndCacheAgenda() {
         console.log(`Error evaluando Béisbol Rebelde: ${err}`);
     }
     // XERED LMP (Virtual basado en moda horaria)
-    const lmpGames = finalEvents.filter(e => 
-        String(e.idLeague) === LMP_LEAGUE_ID && 
-        String(e.strTimestamp).startsWith(todayString)
+    const lmpGames = finalEvents.filter(e =>
+        String(e.idLeague) === LMP_LEAGUE_ID &&
+        e.strTimestamp && e.strTimestamp.toISOString && e.strTimestamp.toISOString().startsWith(todayString)
     );
     if (lmpGames.length > 0) {
         const timeCounts = {};
         lmpGames.forEach(g => {
-            timeCounts[g.strTimestamp] = (timeCounts[g.strTimestamp] || 0) + 1;
+            if(g.strTimestamp) {
+                // Usar getTime() para evitar conversión a string del Date
+                const timeKey = g.strTimestamp.getTime();
+                timeCounts[timeKey] = (timeCounts[timeKey] || 0) + 1;
+            }
         });
-        let bestTime = Object.keys(timeCounts).reduce((a, b) => 
+        let bestTime = Object.keys(timeCounts).map(Number).reduce((a, b) =>
             timeCounts[a] > timeCounts[b] ? a : b
         );
         const virtualEventId = `virtual-xered-${todayString}`;
@@ -890,16 +890,16 @@ async function fetchAndCacheAgenda() {
             (e.idLeague === GODEANO_PRESENTS_ID && e.strEvent === "Liga Mexicana del Pacífico")
         );
         if(!existingXeredEvent){
-            virtualEvents.push({ 
-                idEvent: `virtual-xered-${todayString}`, 
-                strEvent: "Liga Mexicana del Pacífico", 
-                strLeague: "Godeano Sports PRESENTA", 
-                strTimestamp: bestTime, 
-                station_ids: [XERED_ID], 
-                idLeague: GODEANO_PRESENTS_ID, 
-                strStatus: "VIRTUAL" 
+            virtualEvents.push({
+                idEvent: `virtual-xered-${todayString}`,
+                strEvent: "Liga Mexicana del Pacífico",
+                strLeague: "Godeano Sports PRESENTA",
+                strTimestamp: new Date(bestTime),
+                station_ids: [XERED_ID],
+                idLeague: GODEANO_PRESENTS_ID,
+                strStatus: "VIRTUAL"
             });
-            console.log(`Evento virtual 'XERED LMP' creado para ${bestTime}.`);
+            console.log(`Evento virtual 'XERED LMP' creado para ${new Date(bestTime).toISOString()}.`);
         }
     }
     let finalAgenda = [...finalEvents, ...virtualEvents].filter(event => event.station_ids && event.station_ids.length > 0);
@@ -909,15 +909,12 @@ async function fetchAndCacheAgenda() {
         session=await mongoose.startSession();
         session.startTransaction();
         console.log('Inicio de la transacción...');
-        /*await agendaEventModel.deleteMany({},{session});
-        console.log('Base de datos limpiada.');
-        finalAgenda=finalAgenda.map(ev=>{
-            if(ev._id) delete ev._id;
-            return ev;
-        });
-        await agendaEventModel.insertMany(finalAgenda, { session, ordered: false });*/
         //Actualizar lo necesario en lugar de borrar toda la colección
         for(const event of finalAgenda){
+            // Convertir dateEventLocal de string a Date (único campo que necesita conversión)
+            if(event.dateEventLocal && typeof event.dateEventLocal === 'string') {
+                event.dateEventLocal = new Date(event.dateEventLocal);
+            }
             let filtro;
             if(event._id){
                 filtro={ _id: event._id };
@@ -932,14 +929,12 @@ async function fetchAndCacheAgenda() {
             );
         }
         console.log(`Se actualizaron ${finalAgenda.length} eventos en MongoDB.`);
-        
         // MODIFICACIÓN: Garbage Collector (Limpieza segura de eventos muy viejos)
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
         await agendaEventModel.deleteMany({
             strTimestamp: { $lt: twentyFourHoursAgo.toISOString() }
         }, { session });
         console.log("Limpieza completada: Partidos de hace más de 24hs eliminados.");
-
         await session.commitTransaction();
         console.log('Fin de la transacción');
         session.endSession();
@@ -949,7 +944,7 @@ async function fetchAndCacheAgenda() {
             await deleteKeysByPattern('agenda_event_*');
         }
         catch (err) {
-            console.log(`⚠�  No se pudo limpiar la caché de Redis: ${err.message}`);
+            console.log(`⚠�  No se pudo limpiar la caché de Redis: ${err.message}`);
         }
     }
     catch (error) {
@@ -959,7 +954,7 @@ async function fetchAndCacheAgenda() {
                 console.log("Transacción abortada correctamente.");
             }
             catch (abortErr) {
-                console.log(`⚠�  Error abortando transacción: ${abortErr.message}`);
+                console.log(`⚠�  Error abortando transacción: ${abortErr.message}`);
             }
             finally {
                 session.endSession();
@@ -975,13 +970,13 @@ async function fetchAndCacheAgenda() {
                 console.log('Conexión Redis cerrada correctamente.');
             }
         } catch (err) {
-            console.log(`⚠�  Error al cerrar Redis: ${err.message}`);
+            console.log(`⚠�  Error al cerrar Redis: ${err.message}`);
         }
         try {
             await mongoose.connection.close();
             console.log('Conexión a MongoDB cerrada correctamente.');
         } catch (err) {
-            console.log(`⚠�  Error al cerrar MongoDB: ${err.message}`);
+            console.log(`⚠�  Error al cerrar MongoDB: ${err.message}`);
         }
         const endTimeOperation=Date.now();
         const totalMs= endTimeOperation - startTimeOperation;
