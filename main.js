@@ -11,6 +11,7 @@ import passport from "./Auth/authStrategy.js";
 
 const app=express();
 const port=config.port;
+app.set('trust proxy', true);
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
