@@ -80,6 +80,7 @@ const postManualEvent=async (req,res)=>{
             strLeague: savedEvent.strLeague,
             idLeague: savedEvent.idLeague,
             strTimestamp: new Date(savedEvent.strTimestamp),
+            strEventEnd: savedEvent.strEventEnd ? new Date(savedEvent.strEventEnd): null,
             station_ids: savedEvent.station_ids,
         };
         const newAgendaEvent= new AgendaEvent(agendaData);
@@ -122,6 +123,7 @@ const putManualEvent=async (req,res)=>{
                 strLeague: updatedEvent.strLeague,
                 idLeague: updatedEvent.idLeague,
                 strTimestamp: new Date(updatedEvent.strTimestamp),
+                strEventEnd: updatedEvent.strEventEnd ? new Date(updatedEvent.strEventEnd): null,
                 station_ids: updatedEvent.station_ids,
             },
             { new: true }

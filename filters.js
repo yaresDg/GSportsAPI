@@ -34,11 +34,20 @@ function orderByRelevantEvents(clientTimeString,clientZoneString, allEvents){
         if(!event.strTimestamp) return false;
         const startTime=event.strTimestamp;
         const eventStartInClientTZ = DateTime.fromISO(startTime.toISOString ? startTime.toISOString() : startTime, {zone: 'UTC'}).setZone(clientTimeZone);
-        if (!eventStartInClientTZ.isValid) return false;
-        const durationInMillis=getEventDuration(event.strSport || event.strLeague)
-        const eventEndInClientTZ = eventStartInClientTZ.plus({ milliseconds: durationInMillis });
-        //Descartar eventos que hayan terminado
-        if(eventEndInClientTZ < now) return false;
+        let eventEndInClientTZ;
+        if(event.strEventEnd){
+            eventEndInClientTZ = DateTime.fromISO(event.strEventEnd.toISOString ? event.strEventEnd.toISOString() : event.strEventEnd, {zone: 'UTC'}).setZone(clientTimeZone);
+            if (!eventEndInClientTZ.isValid) return false;
+            //Descartar eventos que hayan terminado
+            if(eventEndInClientTZ < now) return false;
+        }
+        else{
+            if (!eventStartInClientTZ.isValid) return false;
+            const durationInMillis=getEventDuration(event.strSport || event.strLeague)
+            eventEndInClientTZ = eventStartInClientTZ.plus({ milliseconds: durationInMillis });
+            //Descartar eventos que hayan terminado
+            if(eventEndInClientTZ < now) return false;
+        }
         const isWithinToday = eventStartInClientTZ >= startOfDay && eventStartInClientTZ <= endOfDay;
         const isOngoinFromYesterday = eventStartInClientTZ < startOfDay && eventEndInClientTZ > startOfDay;
         return isWithinToday || isOngoinFromYesterday;
