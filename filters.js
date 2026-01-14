@@ -54,8 +54,8 @@ function orderByRelevantEvents(clientTimeString,clientZoneString, allEvents){
     });
     //Hordenar por fecha
     relevantEvents.sort((a,b)=>{
-        const ad = parseEventDate(a) || new Date(8640000000000000);
-        const bd = parseEventDate(b) || new Date(8640000000000000);
+        const ad = a.strTimestamp ? new Date(a.strTimestamp) : new Date(8640000000000000);
+        const bd = b.strTimestamp ? new Date(b.strTimestamp) : new Date(8640000000000000);
         return ad - bd;
     });
     return relevantEvents;
