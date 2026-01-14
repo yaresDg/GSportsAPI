@@ -52,6 +52,12 @@ function orderByRelevantEvents(clientTimeString,clientZoneString, allEvents){
         const isOngoinFromYesterday = eventStartInClientTZ < startOfDay && eventEndInClientTZ > startOfDay;
         return isWithinToday || isOngoinFromYesterday;
     });
+    //Hordenar por fecha
+    relevantEvents.sort((a,b)=>{
+        const ad = parseEventDate(a) || new Date(8640000000000000);
+        const bd = parseEventDate(b) || new Date(8640000000000000);
+        return ad - bd;
+    });
     return relevantEvents;
 }
 
