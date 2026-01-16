@@ -5,7 +5,6 @@ import redisClient from './redisClient.js';
 import mongoose from 'mongoose';
 import connectDb from './db/connection.js';
 import agendaEventModel from './model/agendaEventModel.js';
-import ManualEvent from './model/manualEventModel.js';
 import Radio from './model/radioModel.js';
 import * as cheerio from 'cheerio';
 import { DateTime } from 'luxon';
@@ -512,32 +511,6 @@ async function fetchAndCacheAgenda() {
         console.log(`Error: no se pudieron cargar las radios de la base de datos: ${error.message}`);
         return;
     }
-    
-    let manualEvents = [];
-    try {
-        manualEvents = await ManualEvent.find({}).lean();
-        console.log(`Se cargaron ${manualEvents.length} eventos desde la base de datos`);
-        
-        manualEvents.forEach(event => {
-            if (Array.isArray(event.station_ids)) {
-                event.station_ids.forEach(station => {
-                    if (typeof station === 'object' && station !== null && station.id) {
-                        if (!radiosData.some(r => r.id === station.id)) {
-                            radiosData.push(station);
-                            console.log(`Inyectada radio "inline" (${station.id}) del evento "${event.strEvent}"`);
-                        }
-                    }
-                });
-            }
-            if (event.inline_radios && Array.isArray(event.inline_radios)) {
-                radiosData.push(...event.inline_radios);
-                console.log(`Inyectadas ${event.inline_radios.length} radios "inline" del evento "${event.strEvent}"`);
-            }
-        });
-    }
-    catch (error) {
-        console.log(`Error al cargar los eventos de la base de datos: ${error.message}`);
-    }
 
     const newlyFetchedEvents = [];
     newlyFetchedEvents.push(...await fetchWinterLeaguesAndMlb());
@@ -651,12 +624,6 @@ async function fetchAndCacheAgenda() {
         rescuedCount++;
     });
     if (rescuedCount > 0) console.log(`Se rescataron ${rescuedCount} eventos válidos (en curso, etc.) de la caché anterior.`);
-    manualEvents.forEach(event => {
-        if (!finalEventsMap.has(event.idEvent)){
-            event.manual=true;
-            finalEventsMap.set(event.idEvent, event);
-        }
-    });
     let allUniqueEvents = Array.from(finalEventsMap.values());
     console.log(`Total de eventos después de la fusión: ${allUniqueEvents.length}.`);
     console.log("\n--- Fase 3: Enriqueciendo la agenda... ---");
@@ -794,10 +761,10 @@ async function fetchAndCacheAgenda() {
     //finalEvents = await fetchAndAssignYoutubeStreams(finalEvents);
     const virtualEvents = [];
     const todayString = now.toISOString().split('T')[0];
-    const hayChampionsHoy = finalEvents.some(e => 
-        String(e.idLeague) === CHAMPIONS_LEAGUE_ID && 
-        e.dateEvent && 
-        e.dateEvent.trim().startsWith(todayString)
+    const hayChampionsHoy = finalEvents.some(e =>
+        String(e.idLeague) === CHAMPIONS_LEAGUE_ID &&
+        e.dateEvent &&
+        String(e.dateEvent).trim().startsWith(todayString)
     );
     if (hayChampionsHoy) {
         const argTime = new Date(Date.UTC(
@@ -830,7 +797,7 @@ async function fetchAndCacheAgenda() {
     }
 
     try {
-        const cubanGamesToday = finalEvents.filter(e => String(e.idLeague) === CUBAN_LEAGUE_ID && e.dateEvent && e.dateEvent.trim().startsWith(todayString));
+        const cubanGamesToday = finalEvents.filter(e => String(e.idLeague) === CUBAN_LEAGUE_ID && e.dateEvent && String(e.dateEvent).trim().startsWith(todayString));
         if (cubanGamesToday.length >= 3) {
             const gameTimes = {};
             cubanGamesToday.forEach(game => {
