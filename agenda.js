@@ -733,10 +733,13 @@ async function fetchAndCacheAgenda() {
                 return date.getDay() === 1; // 1 = Lunes
             });
             mondayGames.forEach(game => {
-                 if (!game.station_ids.includes(WRTO_ID)) {
-                     game.station_ids.push(WRTO_ID);
-                     console.log(`-> Asignado WRTO (MNF) a: ${game.strEvent}`);
-                 }
+                if (!Array.isArray(game.station_ids)) {
+                    game.station_ids = [];
+                }
+                if (!game.station_ids.includes(WRTO_ID)) {
+                    game.station_ids.push(WRTO_ID);
+                    console.log(`-> Asignado WRTO (MNF) a: ${game.strEvent}`);
+                }
             });
 
             // Sunday Night Football (El último juego del domingo)
@@ -748,6 +751,9 @@ async function fetchAndCacheAgenda() {
                 // Ordenar por hora descendente (el último primero)
                 sundayGames.sort((a, b) => new Date(b.strTimestamp) - new Date(a.strTimestamp));
                 const snfGame = sundayGames[0]; // Tomar el último
+                if (!Array.isArray(snfGame.station_ids)) {
+                    snfGame.station_ids = [];
+                }
                 if (!snfGame.station_ids.includes(WRTO_ID)) {
                     snfGame.station_ids.push(WRTO_ID);
                     console.log(`-> Asignado WRTO (SNF) a: ${snfGame.strEvent}`);
